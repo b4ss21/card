@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CryptoPair, Signal, PerformanceStats, Timeframe, ImageAnalysisResult } from '../types';
+import { CryptoPair, Signal, Timeframe, ImageAnalysisResult } from '../types';
 import { BinanceService } from '../services/binanceApi';
 import { TechnicalAnalysisService } from '../services/technicalAnalysis';
 import { SignalCard } from './SignalCard';
-import { PerformancePanel } from './PerformancePanel';
+import { TradingViewWidget } from './TradingViewWidget';
 import { ImageAnalysis } from './ImageAnalysis';
 import { Settings, RefreshCw, Filter } from 'lucide-react';
 
@@ -22,15 +22,6 @@ export function Dashboard() {
 
   const timeframes: Timeframe[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M'];
 
-  const [stats, setStats] = useState<PerformanceStats>({
-    totalSignals: 0,
-    wins: 0,
-    losses: 0,
-    winRate: 0,
-    totalProfit: 0,
-    avgGain: 0,
-    avgLoss: 0
-  });
 
   useEffect(() => {
     // carregamento inicial de pares
@@ -166,32 +157,7 @@ export function Dashboard() {
   };
 
   const calculateStats = () => {
-    const completedSignals = signals.filter(s => s.status === 'WIN' || s.status === 'LOSS');
-    const wins = signals.filter(s => s.status === 'WIN').length;
-    const losses = signals.filter(s => s.status === 'LOSS').length;
-    
-    const winSignals = signals.filter(s => s.status === 'WIN');
-    const lossSignals = signals.filter(s => s.status === 'LOSS');
-    
-    const avgGain = winSignals.length > 0 
-      ? winSignals.reduce((sum, s) => sum + s.expectedGain, 0) / winSignals.length 
-      : 0;
-    
-    const avgLoss = lossSignals.length > 0 
-      ? lossSignals.reduce((sum, s) => sum + s.expectedGain, 0) / lossSignals.length 
-      : 0;
-    
-    const totalProfit = (wins * avgGain) - (losses * avgLoss);
-    
-    setStats({
-      totalSignals: signals.length,
-      wins,
-      losses,
-      winRate: completedSignals.length > 0 ? (wins / completedSignals.length) * 100 : 0,
-      totalProfit,
-      avgGain,
-      avgLoss
-    });
+  // stats removido
   };
 
   const handleSignalStatusUpdate = (id: string, status: Signal['status']) => {
@@ -303,9 +269,13 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Performance Panel */}
+        {/* TradingView Chart Panel */}
         <div className="mb-6">
-          <PerformancePanel stats={stats} />
+          {selectedSymbol ? (
+            <TradingViewWidget symbol={selectedSymbol} interval={selectedTimeframe} />
+          ) : (
+            <div className="text-center text-gray-400 py-12">Selecione um sinal para visualizar o gráfico</div>
+          )}
         </div>
 
         {/* Image Analysis */}
@@ -337,6 +307,10 @@ export function Dashboard() {
                   key={signal.id}
                   signal={signal}
                   onUpdateStatus={handleSignalStatusUpdate}
+                  onClick={() => {
+                    setSelectedSymbol(signal.symbol);
+                    setSelectedTimeframe(signal.timeframe as Timeframe);
+                  }}
                 />
               ))}
             </div>
