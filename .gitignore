@@ -2,3 +2,15 @@ node_modules/
 dist/
 .env
 .DS_Store
+.cache/
+*.log
+*.tmp
+*.swp
+*.swo
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+build/
+tmp/
