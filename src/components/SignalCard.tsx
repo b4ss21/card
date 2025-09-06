@@ -5,10 +5,9 @@ import { TrendingUp, TrendingDown, Clock, Target, Shield, Zap } from 'lucide-rea
 interface SignalCardProps {
   signal: Signal;
   onUpdateStatus: (id: string, status: Signal['status']) => void;
-  onClick?: () => void;
 }
 
-export function SignalCard({ signal, onUpdateStatus, onClick }: SignalCardProps) {
+export function SignalCard({ signal, onUpdateStatus }: SignalCardProps) {
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-green-600 bg-green-100';
     if (confidence >= 60) return 'text-yellow-600 bg-yellow-100';
@@ -29,10 +28,7 @@ export function SignalCard({ signal, onUpdateStatus, onClick }: SignalCardProps)
   };
 
   return (
-    <div
-      className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-      onClick={onClick}
-    >
+    <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-full ${signal.type === 'BUY' ? 'bg-green-100' : 'bg-red-100'}`}>
