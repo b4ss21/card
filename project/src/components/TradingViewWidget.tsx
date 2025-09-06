@@ -25,37 +25,44 @@ const timeframeMap: Record<string, string> = {
   '1M': 'M',
 };
 
+
 export const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol, interval, height = 420 }) => {
   const container = useRef<HTMLDivElement>(null);
+  // Gera um id único para o container
+  const widgetId = `tv-widget-container-${symbol.replace(/[^a-zA-Z0-9]/g, '')}-${interval}`;
 
   useEffect(() => {
     if (!symbol || !interval) return;
-    // Remove widget anterior
-    if (container.current) container.current.innerHTML = '';
-    // Cria novo script
+    if (!container.current) return;
+    container.current.innerHTML = '';
+
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/tv.js';
     script.async = true;
-    script.innerHTML = `
-      new TradingView.widget({
-        autosize: true,
-        symbol: 'BINANCE:${symbol.replace('USDT','/USDT')}',
-        interval: '${timeframeMap[interval] || '60'}',
-        timezone: 'Etc/UTC',
-        theme: 'light',
-        style: '1',
-        locale: 'br',
-        toolbar_bg: '#f1f3f6',
-        enable_publishing: false,
-        hide_top_toolbar: false,
-        hide_legend: false,
-        save_image: false,
-        container_id: 'tv-widget-container',
-        height: ${height}
-      });
-    `;
-    if (container.current) container.current.appendChild(script);
-  }, [symbol, interval, height]);
+    script.onload = () => {
+      // @ts-ignore
+      if (window.TradingView) {
+        // @ts-ignore
+        new window.TradingView.widget({
+          autosize: true,
+          symbol: `BINANCE:${symbol}`,
+          interval: timeframeMap[interval] || '60',
+          timezone: 'Etc/UTC',
+          theme: 'light',
+          style: '1',
+          locale: 'br',
+          toolbar_bg: '#f1f3f6',
+          enable_publishing: false,
+          hide_top_toolbar: false,
+          hide_legend: false,
+          save_image: false,
+          container_id: widgetId,
+          height: height
+        });
+      }
+    };
+    container.current.appendChild(script);
+  }, [symbol, interval, height, widgetId]);
 
-  return <div id="tv-widget-container" ref={container} style={{ width: '100%', height }} />;
+  return <div id={widgetId} ref={container} style={{ width: '100%', height }} />;
 };
