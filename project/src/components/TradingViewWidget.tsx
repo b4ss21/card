@@ -26,11 +26,13 @@ const timeframeMap: Record<string, string> = {
 };
 
 
-export const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol, interval, height = 420 }) => {
+
+export const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol, interval }) => {
   const container = useRef<HTMLDivElement>(null);
   // Gera um id único para o container
   const widgetId = `tv-widget-container-${symbol.replace(/[^a-zA-Z0-9]/g, '')}-${interval}`;
 
+  // Altura responsiva 4:3
   useEffect(() => {
     if (!symbol || !interval) return;
     if (!container.current) return;
@@ -56,13 +58,21 @@ export const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol, in
           hide_top_toolbar: false,
           hide_legend: false,
           save_image: false,
-          container_id: widgetId,
-          height: height
+          container_id: widgetId
         });
       }
     };
     container.current.appendChild(script);
-  }, [symbol, interval, height, widgetId]);
+  }, [symbol, interval, widgetId]);
 
-  return <div id={widgetId} ref={container} style={{ width: '100%', height }} />;
+  // Wrapper para manter proporção 4:3
+  return (
+    <div style={{ width: '100%', aspectRatio: '4 / 3', position: 'relative' }}>
+      <div
+        id={widgetId}
+        ref={container}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+      />
+    </div>
+  );
 };

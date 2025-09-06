@@ -21,17 +21,44 @@ export function ImageAnalysis({ onAnalysisResult }: ImageAnalysisProps) {
     
     // Simulate AI analysis (in a real app, this would call an AI service)
     setTimeout(() => {
+      // Mockup avançado: padrões, tendências e recomendações variadas
+      const trends = ['BULLISH', 'BEARISH', 'NEUTRAL'] as const;
+      const patternsList = [
+        'Triângulo ascendente detectado',
+        'Triângulo descendente detectado',
+        'Topo duplo',
+        'Fundo duplo',
+        'Bandeira de alta',
+        'Bandeira de baixa',
+        'Candle de reversão (martelo)',
+        'Candle de reversão (estrela cadente)',
+        'Rompimento de resistência',
+        'Rompimento de suporte',
+        'Volume acima da média',
+        'Divergência de RSI',
+        'Nível de suporte em antiga resistência',
+        'Canal de alta',
+        'Canal de baixa'
+      ];
+      const recommendations = [
+        'A análise sugere possível movimento de alta após rompimento de resistência e padrão de volume.',
+        'Atenção para possível reversão de tendência devido à formação de candle de reversão.',
+        'Tendência de baixa pode se intensificar após perda de suporte importante.',
+        'Movimento lateral detectado, aguarde confirmação de rompimento.',
+        'Padrão de continuação sugere manutenção da tendência atual.',
+        'Divergência de RSI pode indicar enfraquecimento da tendência.'
+      ];
+      const trend = trends[Math.floor(Math.random() * trends.length)];
+      const confidence = Math.floor(Math.random() * 40) + 60;
+      // Seleciona de 2 a 4 padrões aleatórios
+      const patterns = patternsList.sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 3) + 2);
+      const recommendation = recommendations[Math.floor(Math.random() * recommendations.length)];
       const mockResult: ImageAnalysisResult = {
-        trend: Math.random() > 0.5 ? 'BULLISH' : Math.random() > 0.3 ? 'BEARISH' : 'NEUTRAL',
-        confidence: Math.floor(Math.random() * 40) + 60,
-        patterns: [
-          'Triângulo ascendente detectado',
-          'Padrão de rompimento por volume',
-          'Nível de suporte em antiga resistência'
-        ],
-        recommendation: 'A análise técnica sugere possível movimento de alta com base nos padrões do gráfico e análise de volume.'
+        trend,
+        confidence,
+        patterns,
+        recommendation
       };
-      
       setLastResult(mockResult);
       onAnalysisResult(mockResult);
       setAnalyzing(false);

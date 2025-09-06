@@ -14,8 +14,9 @@ export function Dashboard() {
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
   // estado de loading removido (não utilizado)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
-  const MIN_CONFIDENCE = 60; // limiar interno de confiança
+  const [minConfidence, setMinConfidence] = useState(60); // limiar ajustável
   const [maxSignals, setMaxSignals] = useState(10);
+  const [signalError, setSignalError] = useState<string | null>(null);
 
   const binanceService = BinanceService.getInstance();
   const technicalService = new TechnicalAnalysisService();
@@ -56,12 +57,30 @@ export function Dashboard() {
     }
   };
 
+
+  // Mapeamento de quantidade de candles por timeframe
+  const timeframeCandleMap: Record<Timeframe, number> = {
+    '1m': 10000,
+    '3m': 10000,
+    '5m': 10000,
+    '15m': 10000,
+    '30m': 10000,
+    '1h': 10000,
+    '2h': 10000,
+    '4h': 10000,
+    '6h': 10000,
+    '8h': 10000,
+    '12h': 10000,
+    '1d': 5000,
+    '3d': 5000,
+    '1w': 5000,
+    '1M': 5000
+  };
+
   const generateSignals = async () => {
     if (isGenerating) return;
-    
     setIsGenerating(true);
     if (pairs.length === 0) return;
-    
     try {
       // Load pairs if not loaded
       let currentPairs = pairs;
@@ -69,24 +88,20 @@ export function Dashboard() {
         currentPairs = await binanceService.getTop500USDTPairs();
         setPairs(currentPairs);
       }
-      
       // Analyze top 50 pairs for better signal quality
       const topPairs = currentPairs.slice(0, 50);
-      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe);
-      
+      // Define o limit conforme o timeframe selecionado
+      const limit = timeframeCandleMap[selectedTimeframe] || 500;
+      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe, limit);
       // Use batch processing for faster data retrieval
-  const symbols = topPairs.map(p => p.symbol);
-      const batchData = await binanceService.getMultiplePairData(symbols, selectedTimeframe);
-      
+      const symbols = topPairs.map(p => p.symbol);
+      const batchData = await binanceService.getMultiplePairData(symbols, selectedTimeframe, limit);
       const newSignals: Signal[] = [];
-      
-  const targetPairs = topPairs;
-
+      const targetPairs = topPairs;
       for (const pair of targetPairs) {
         const rawData = batchData.get(pair.symbol);
-  if (!rawData || !Array.isArray(rawData)) continue;
-
-  // tipagem explícita do kline para evitar 'any'
+        if (!rawData || !Array.isArray(rawData)) continue;
+        // tipagem explícita do kline para evitar 'any'
         const candles = rawData.map((kline) => ({
           timestamp: Number(kline[0]),
           open: parseFloat(kline[1]),
@@ -95,12 +110,9 @@ export function Dashboard() {
           close: parseFloat(kline[4]),
           volume: parseFloat(kline[5])
         }));
-        
         if (candles.length < 50) continue;
-        
         const indicators = technicalService.analyzeIndicators(candles);
         const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
-        
         const signal = technicalService.generateSignal(
           pair.symbol,
           candles,
@@ -108,17 +120,14 @@ export function Dashboard() {
           btcCorrelation,
           selectedTimeframe
         );
-        
-  if (signal && signal.confidence >= MIN_CONFIDENCE) {
+        if (signal && signal.confidence >= minConfidence) {
           newSignals.push(signal);
         }
       }
-      
       // Sort by confidence and take top signals
       const sortedSignals = newSignals
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, maxSignals);
-      
       if (sortedSignals.length > 0) {
         setSignals(prev => [...sortedSignals, ...prev.slice(0, 100 - sortedSignals.length)]);
       }
@@ -130,13 +139,18 @@ export function Dashboard() {
   };
 
   const generateSignalForSymbol = async () => {
+    setSignalError(null);
     if (isGenerating || !selectedSymbol) return;
     setIsGenerating(true);
     try {
-      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe);
-      const raw = await binanceService.getKlineData(selectedSymbol, selectedTimeframe);
+      const limit = timeframeCandleMap[selectedTimeframe] || 500;
+      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe, limit);
+      const raw = await binanceService.getKlineData(selectedSymbol, selectedTimeframe, limit);
       const candles = raw;
-      if (candles.length < 50) return;
+      if (!candles || candles.length < 50) {
+        setSignalError('Não há candles suficientes para gerar sinal nesta moeda/timeframe.');
+        return;
+      }
       const indicators = technicalService.analyzeIndicators(candles);
       const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
       const signal = technicalService.generateSignal(
@@ -146,10 +160,13 @@ export function Dashboard() {
         btcCorrelation,
         selectedTimeframe
       );
-      if (signal && signal.confidence >= MIN_CONFIDENCE) {
+      if (signal && signal.confidence >= minConfidence) {
         setSignals(prev => [signal, ...prev].slice(0, 100));
+      } else {
+        setSignalError('Não foi possível gerar sinal para esta moeda/timeframe com a confiança mínima definida.');
       }
     } catch (e) {
+      setSignalError('Erro ao tentar gerar sinal. Veja o console para detalhes.');
       console.error('Error generating single symbol signal:', e);
     } finally {
       setIsGenerating(false);
@@ -171,7 +188,9 @@ export function Dashboard() {
     console.log('Image analysis result:', result);
   };
 
-  const filteredSignals = signals;
+  // Exibe todos os sinais gerados
+  // Exibe apenas sinais do timeframe selecionado
+  const filteredSignals = signals.filter(s => s.timeframe === selectedTimeframe);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -258,6 +277,23 @@ export function Dashboard() {
               </select>
             </div>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confiança mínima</label>
+              <input
+                type="range"
+                min={30}
+                max={95}
+                step={1}
+                value={minConfidence}
+                onChange={e => setMinConfidence(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>30</span>
+                <span>{minConfidence}%</span>
+                <span>95</span>
+              </div>
+            </div>
             <div className="flex items-end">
               <div className="text-sm text-gray-600">
                 <p>Pares carregados: <span className="font-medium">{pairs.length}</span></p>
@@ -283,6 +319,12 @@ export function Dashboard() {
           <ImageAnalysis onAnalysisResult={handleImageAnalysis} />
         </div>
 
+        {/* Feedback de erro do sinal */}
+        {signalError && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-center">
+            {signalError}
+          </div>
+        )}
         {/* Signals Grid */}
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-6">

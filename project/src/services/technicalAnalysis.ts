@@ -308,14 +308,25 @@ export class TechnicalAnalysisService {
     // Minimum confidence threshold
     if (!signalType || confidence < 65) return null;
     
-    // Calculate more accurate target and stop loss based on volatility and support/resistance
+    // Ajusta o alvo conforme o timeframe
+    const timeframeTargetMap: Record<string, number> = {
+      '1m': 0.01, '3m': 0.012, '5m': 0.015, '15m': 0.018, '30m': 0.02,
+      '1h': 0.025, '2h': 0.03, '4h': 0.04, '6h': 0.05, '8h': 0.06, '12h': 0.07,
+      '1d': 0.10, '3d': 0.15, '1w': 0.20, '1M': 0.30
+    };
+    const timeframeStopMap: Record<string, number> = {
+      '1m': 0.008, '3m': 0.01, '5m': 0.012, '15m': 0.014, '30m': 0.015,
+      '1h': 0.018, '2h': 0.02, '4h': 0.025, '6h': 0.03, '8h': 0.035, '12h': 0.04,
+      '1d': 0.05, '3d': 0.07, '1w': 0.10, '1M': 0.15
+    };
+    const baseTargetPercent = timeframeTargetMap[timeframe] ?? 0.02;
+    const baseStopPercent = timeframeStopMap[timeframe] ?? 0.015;
+    // Volatilidade ainda influencia levemente
     const volatilityMultiplier = Math.min(indicators.volatility / 50, 2);
-    const baseTargetPercent = 0.02 + (volatilityMultiplier * 0.01); // 2-4% based on volatility
-    const baseStopPercent = 0.015 + (volatilityMultiplier * 0.005); // 1.5-2.5% based on volatility
-    
-    const targetMultiplier = signalType === 'BUY' ? (1 + baseTargetPercent) : (1 - baseTargetPercent);
-    const stopMultiplier = signalType === 'BUY' ? (1 - baseStopPercent) : (1 + baseStopPercent);
-    
+    const targetPercent = baseTargetPercent + (volatilityMultiplier * 0.005);
+    const stopPercent = baseStopPercent + (volatilityMultiplier * 0.003);
+    const targetMultiplier = signalType === 'BUY' ? (1 + targetPercent) : (1 - targetPercent);
+    const stopMultiplier = signalType === 'BUY' ? (1 - stopPercent) : (1 + stopPercent);
     // Ensure target and stop are different from entry
     const targetPrice = currentPrice * targetMultiplier;
     const stopLoss = currentPrice * stopMultiplier;

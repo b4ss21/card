@@ -1,3 +1,4 @@
+
 import { CryptoPair, Candle, Timeframe } from '../types';
 
 const BINANCE_API_BASE = 'https://api.binance.com/api/v3';
@@ -10,6 +11,45 @@ export class BinanceService {
       BinanceService.instance = new BinanceService();
     }
     return BinanceService.instance;
+  }
+
+  // Busca o máximo de candles possível para o símbolo/timeframe (paginando)
+  async getAllKlineData(symbol: string, interval: Timeframe): Promise<Candle[]> {
+    const maxPerRequest = 1000;
+    let allCandles: Candle[] = [];
+    let fetchMore = true;
+    let endTime: number | undefined = undefined;
+    try {
+      while (fetchMore) {
+        let url = `${BINANCE_API_BASE}/klines?symbol=${symbol}&interval=${interval}&limit=${maxPerRequest}`;
+        if (endTime) url += `&endTime=${endTime}`;
+        const response = await fetch(url);
+        const data: unknown = await response.json();
+        const candles = (data as string[][]).map((kline) => ({
+          timestamp: Number(kline[0]),
+          open: parseFloat(kline[1]),
+          high: parseFloat(kline[2]),
+          low: parseFloat(kline[3]),
+          close: parseFloat(kline[4]),
+          volume: parseFloat(kline[5])
+        }));
+        if (candles.length === 0) break;
+        // Evita duplicidade do último candle
+        if (allCandles.length > 0 && candles.length > 1) {
+          candles.pop();
+        }
+        allCandles = [...candles, ...allCandles];
+        if (candles.length < maxPerRequest) {
+          fetchMore = false;
+        } else {
+          endTime = candles[0].timestamp - 1;
+        }
+      }
+      return allCandles;
+    } catch (error) {
+      console.error('Error fetching all kline data:', error);
+      return allCandles;
+    }
   }
 
   async getTop500USDTPairs(): Promise<CryptoPair[]> {
@@ -44,7 +84,7 @@ export class BinanceService {
     }
   }
 
-  async getMultiplePairData(symbols: string[], interval: Timeframe): Promise<Map<string, string[][]>> {
+  async getMultiplePairData(symbols: string[], interval: Timeframe, limit: number = 100): Promise<Map<string, string[][]>> {
     const results = new Map<string, string[][]>();
     
     try {
@@ -53,7 +93,7 @@ export class BinanceService {
       for (let i = 0; i < symbols.length; i += batchSize) {
         const batch = symbols.slice(i, i + batchSize);
         const promises = batch.map(symbol => 
-          fetch(`${BINANCE_API_BASE}/klines?symbol=${symbol}&interval=${interval}&limit=100`)
+          fetch(`${BINANCE_API_BASE}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`)
             .then(res => res.json())
             .then((data: unknown) => ({ symbol, data }))
             .catch(error => ({ symbol, error }))
