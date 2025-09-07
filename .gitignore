@@ -1,10 +1,15 @@
 node_modules/
 dist/
-.env
-.DS_Store
 .cache/
 *.log
-*.tmp
+.env
+.env.*
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+# Ignorar arquivos temporários do editor
+.vscode/
+.idea/
 *.swp
 *.swo
 npm-debug.log*
