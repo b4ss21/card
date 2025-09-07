@@ -58,24 +58,8 @@ export function Dashboard() {
   };
 
 
-  // Mapeamento de quantidade de candles por timeframe
-  const timeframeCandleMap: Record<Timeframe, number> = {
-    '1m': 10000,
-    '3m': 10000,
-    '5m': 10000,
-    '15m': 10000,
-    '30m': 10000,
-    '1h': 10000,
-    '2h': 10000,
-    '4h': 10000,
-    '6h': 10000,
-    '8h': 10000,
-    '12h': 10000,
-    '1d': 5000,
-    '3d': 5000,
-    '1w': 5000,
-    '1M': 5000
-  };
+  // Busca total de candles disponíveis para todos os timeframes
+
 
   const generateSignals = async () => {
     if (isGenerating) return;
@@ -90,12 +74,21 @@ export function Dashboard() {
       }
       // Analyze top 50 pairs for better signal quality
       const topPairs = currentPairs.slice(0, 50);
-      // Define o limit conforme o timeframe selecionado
-      const limit = timeframeCandleMap[selectedTimeframe] || 500;
-      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe, limit);
-      // Use batch processing for faster data retrieval
-      const symbols = topPairs.map(p => p.symbol);
-      const batchData = await binanceService.getMultiplePairData(symbols, selectedTimeframe, limit);
+      // Busca todos os candles disponíveis para o timeframe
+      const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
+      // Busca todos os candles para cada par (um a um para garantir total)
+      const batchData = new Map();
+      for (const pair of topPairs) {
+        const candles = await binanceService.getAllKlineData(pair.symbol, selectedTimeframe);
+        batchData.set(pair.symbol, candles.map(kline => [
+          kline.timestamp,
+          kline.open,
+          kline.high,
+          kline.low,
+          kline.close,
+          kline.volume
+        ]));
+      }
       const newSignals: Signal[] = [];
       const targetPairs = topPairs;
       for (const pair of targetPairs) {
@@ -143,10 +136,9 @@ export function Dashboard() {
     if (isGenerating || !selectedSymbol) return;
     setIsGenerating(true);
     try {
-      const limit = timeframeCandleMap[selectedTimeframe] || 500;
-      const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe, limit);
-      const raw = await binanceService.getKlineData(selectedSymbol, selectedTimeframe, limit);
-      const candles = raw;
+  // Busca todos os candles disponíveis para o timeframe
+  const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
+  const candles = await binanceService.getAllKlineData(selectedSymbol, selectedTimeframe);
       if (!candles || candles.length < 50) {
         setSignalError('Não há candles suficientes para gerar sinal nesta moeda/timeframe.');
         return;
