@@ -27,8 +27,7 @@ export function ImageAnalysis({ onAnalysisResult }: ImageAnalysisProps) {
     const img = new window.Image();
     img.src = url;
     img.onload = async () => {
-      // Cria um tensor a partir da imagem
-      const tensor = tf.browser.fromPixels(img);
+  // Cria um tensor a partir da imagem (removido:   git push origin gh-pages utilizado)
       // Carrega o modelo coco-ssd
       const model = await cocoSsd.load();
       // Faz a detecção de objetos
