@@ -17,6 +17,7 @@ export function Dashboard() {
   const [minConfidence, setMinConfidence] = useState(60); // limiar ajustável
   const [maxSignals, setMaxSignals] = useState(10);
   const [signalError, setSignalError] = useState<string | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators'>('indicators');
 
   const binanceService = BinanceService.getInstance();
   const technicalService = new TechnicalAnalysisService();
@@ -82,51 +83,50 @@ export function Dashboard() {
     setIsGenerating(true);
     if (pairs.length === 0) return;
     try {
-      // Load pairs if not loaded
       let currentPairs = pairs;
       if (currentPairs.length === 0) {
         currentPairs = await binanceService.getTop500USDTPairs();
         setPairs(currentPairs);
       }
-      // Analyze top 50 pairs for better signal quality
       const topPairs = currentPairs.slice(0, 50);
-      // Define o limit conforme o timeframe selecionado
-      const limit = timeframeCandleMap[selectedTimeframe] || 500;
-  const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
-      // Use batch processing for faster data retrieval
-      const symbols = topPairs.map(p => p.symbol);
-  // Atenção: getMultiplePairData não faz paginação, só pega até 1000 candles por par
-  const batchData = await binanceService.getMultiplePairData(symbols, selectedTimeframe, limit);
-      const newSignals: Signal[] = [];
-      const targetPairs = topPairs;
-      for (const pair of targetPairs) {
-        const rawData = batchData.get(pair.symbol);
-        if (!rawData || !Array.isArray(rawData)) continue;
-        // tipagem explícita do kline para evitar 'any'
-        const candles = rawData.map((kline) => ({
-          timestamp: Number(kline[0]),
-          open: parseFloat(kline[1]),
-          high: parseFloat(kline[2]),
-          low: parseFloat(kline[3]),
-          close: parseFloat(kline[4]),
-          volume: parseFloat(kline[5])
-        }));
-        if (candles.length < 50) continue;
-        const indicators = technicalService.analyzeIndicators(candles);
-        const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
-        const signal = technicalService.generateSignal(
-          pair.symbol,
-          candles,
-          indicators,
-          btcCorrelation,
-          selectedTimeframe
-        );
-        if (signal && signal.confidence >= minConfidence) {
-          newSignals.push(signal);
+      let allSignals: Signal[] = [];
+      for (const timeframe of timeframes) {
+        const btcCandles = await binanceService.getAllKlineData('BTCUSDT', timeframe);
+        for (const pair of topPairs) {
+          const candles = await binanceService.getAllKlineData(pair.symbol, timeframe);
+          if (!candles || candles.length < 50) continue;
+          let indicators: any;
+          if (analysisMode === 'indicators') {
+            indicators = technicalService.analyzeIndicators(candles);
+          } else {
+            // Indicadores neutros para análise só de velas
+            const last = candles[candles.length - 1];
+            indicators = {
+              ema12: last.close,
+              ema26: last.close,
+              ema50: last.close,
+              rsi: 50,
+              stochastic: { k: 50, d: 50 },
+              bollingerBands: { upper: last.close, middle: last.close, lower: last.close },
+              macd: { macd: 0, signal: 0, histogram: 0 },
+              volatility: 0,
+              volumeProfile: 1
+            };
+          }
+          const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+          const signal = technicalService.generateSignal(
+            pair.symbol,
+            candles,
+            indicators,
+            btcCorrelation,
+            timeframe
+          );
+          if (signal && signal.confidence >= minConfidence) {
+            allSignals.push(signal);
+          }
         }
       }
-      // Sort by confidence and take top signals
-      const sortedSignals = newSignals
+      const sortedSignals = allSignals
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, maxSignals);
       if (sortedSignals.length > 0) {
@@ -138,6 +138,37 @@ export function Dashboard() {
       setIsGenerating(false);
     }
   };
+  // Para cada timeframe, busca candles e gera sinais
+  for (const timeframe of timeframes) {
+    // Busca candles do BTC para o timeframe
+    const btcCandles = await binanceService.getAllKlineData('BTCUSDT', timeframe);
+    for (const pair of topPairs) {
+      const candles = await binanceService.getAllKlineData(pair.symbol, timeframe);
+      if (!candles || candles.length < 50) continue;
+        let indicators = undefined;
+        if (analysisMode === 'indicators') {
+          indicators = technicalService.analyzeIndicators(candles);
+        }
+        const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+        const signal = technicalService.generateSignal(
+          pair.symbol,
+          candles,
+          indicators,
+          btcCorrelation,
+          timeframe
+        );
+      if (signal && signal.confidence >= minConfidence) {
+        newSignals.push(signal);
+      }
+    }
+  }
+  // Ordena e limita os sinais
+  const sortedSignals = newSignals
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, maxSignals);
+  if (sortedSignals.length > 0) {
+    setSignals(prev => [...sortedSignals, ...prev.slice(0, 100 - sortedSignals.length)]);
+  }
 
   const generateSignalForSymbol = async () => {
     setSignalError(null);
@@ -151,7 +182,23 @@ export function Dashboard() {
         setSignalError('Não há candles suficientes para gerar sinal nesta moeda/timeframe.');
         return;
       }
-      const indicators = technicalService.analyzeIndicators(candles);
+      let indicators;
+      if (analysisMode === 'indicators') {
+        indicators = technicalService.analyzeIndicators(candles);
+      } else {
+        const last = candles[candles.length - 1];
+        indicators = {
+          ema12: last.close,
+          ema26: last.close,
+          ema50: last.close,
+          rsi: 50,
+          stochastic: { k: 50, d: 50 },
+          bollingerBands: { upper: last.close, middle: last.close, lower: last.close },
+          macd: { macd: 0, signal: 0, histogram: 0 },
+          volatility: 0,
+          volumeProfile: 1
+        };
+      }
       const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
       const signal = technicalService.generateSignal(
         selectedSymbol,
@@ -219,7 +266,18 @@ export function Dashboard() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Análise</label>
+              <select
+                value={analysisMode}
+                onChange={e => setAnalysisMode(e.target.value as 'candles' | 'indicators')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="indicators">Indicadores + Candles</option>
+                <option value="candles">Somente Candles</option>
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
               <select
