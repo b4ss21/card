@@ -1,0 +1,14 @@
+# Ignorar dependências, builds e caches
+node_modules/
+dist/
+.cache/
+*.log
+.env
+.env.*
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+# Ignorar arquivos temporários do editor
+.vscode/
+.idea/
+*.swp
