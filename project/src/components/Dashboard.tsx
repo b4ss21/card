@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { CryptoPair, Signal, PerformanceStats, Timeframe, ImageAnalysisResult } from '../types';
-import { BinanceService } from '../services/binanceApi';
-import { TechnicalAnalysisService } from '../services/technicalAnalysis';
 import { SignalCard } from './SignalCard';
 import { PerformancePanel } from './PerformancePanel';
 import { ImageAnalysis } from './ImageAnalysis';
+import { TradingViewWidget } from './TradingViewWidget';
 import { Settings, RefreshCw, Filter } from 'lucide-react';
 
-export function Dashboard() {
   const [pairs, setPairs] = useState<CryptoPair[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -16,6 +14,8 @@ export function Dashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const MIN_CONFIDENCE = 60; // limiar interno de confiança
   const [maxSignals, setMaxSignals] = useState(10);
+  // Novo estado para tipo de análise
+  const [analysisType, setAnalysisType] = useState<'candles' | 'all'>('all');
 
   const binanceService = BinanceService.getInstance();
   const technicalService = new TechnicalAnalysisService();
@@ -107,9 +107,14 @@ export function Dashboard() {
         
         if (candles.length < 50) continue;
         
-        const indicators = technicalService.analyzeIndicators(candles);
-        const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
-        
+        // Lógica para análise baseada no tipo selecionado
+        let indicators = undefined;
+        let btcCorrelation = undefined;
+        if (analysisType === 'all') {
+          indicators = technicalService.analyzeIndicators(candles);
+          btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+        }
+        // Gera sinal considerando o tipo de análise
         const signal = technicalService.generateSignal(
           pair.symbol,
           candles,
@@ -146,8 +151,12 @@ export function Dashboard() {
   const raw = await binanceService.getAllKlineData(selectedSymbol, selectedTimeframe);
       const candles = raw;
       if (candles.length < 50) return;
-      const indicators = technicalService.analyzeIndicators(candles);
-      const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+      let indicators = undefined;
+      let btcCorrelation = undefined;
+      if (analysisType === 'all') {
+        indicators = technicalService.analyzeIndicators(candles);
+        btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+      }
       const signal = technicalService.generateSignal(
         selectedSymbol,
         candles,
@@ -234,7 +243,19 @@ export function Dashboard() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Análise</label>
+              <select
+                value={analysisType}
+                onChange={e => setAnalysisType(e.target.value as 'candles' | 'all')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">Todos os Indicadores</option>
+                <option value="candles">Somente Candles (OHLCV)</option>
+              </select>
+              <span className="text-xs text-gray-500">Escolha se deseja analisar apenas candles ou todos os indicadores técnicos.</span>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
               <select
