@@ -134,9 +134,8 @@ export function Dashboard() {
     if (isGenerating || !selectedSymbol) return;
     setIsGenerating(true);
     try {
-      const limit = timeframeCandleMap[selectedTimeframe] || 500;
-  const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
-  const candles = await binanceService.getAllKlineData(selectedSymbol, selectedTimeframe);
+      const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
+      const candles = await binanceService.getAllKlineData(selectedSymbol, selectedTimeframe);
       if (!candles || candles.length < 50) {
         setSignalError('Não há candles suficientes para gerar sinal nesta moeda/timeframe.');
         return;
