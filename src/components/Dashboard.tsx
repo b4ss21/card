@@ -13,9 +13,17 @@ export function Dashboard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
   // estado de loading removido (não utilizado)
+<<<<<<< HEAD
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const MIN_CONFIDENCE = 60; // limiar interno de confiança
   const [maxSignals, setMaxSignals] = useState(10);
+=======
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('BTCUSDT');
+  const [minConfidence, setMinConfidence] = useState(60); // limiar ajustável
+  const [maxSignals, setMaxSignals] = useState(10);
+  const [signalError, setSignalError] = useState<string | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators'>('indicators');
+>>>>>>> origin/main-forcada
 
   const binanceService = BinanceService.getInstance();
   const technicalService = new TechnicalAnalysisService();
@@ -72,12 +80,12 @@ export function Dashboard() {
     if (pairs.length === 0) return;
     
     try {
-      // Load pairs if not loaded
       let currentPairs = pairs;
       if (currentPairs.length === 0) {
         currentPairs = await binanceService.getTop500USDTPairs();
         setPairs(currentPairs);
       }
+<<<<<<< HEAD
       
       // Analyze top 50 pairs for better signal quality
       const topPairs = currentPairs.slice(0, 50);
@@ -125,6 +133,37 @@ export function Dashboard() {
       
       // Sort by confidence and take top signals
       const sortedSignals = newSignals
+=======
+      const topPairs = currentPairs.slice(0, 50);
+      const allSignals: Signal[] = [];
+      const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
+      for (const pair of topPairs) {
+        const candles = await binanceService.getAllKlineData(pair.symbol, selectedTimeframe);
+        if (!candles || candles.length < 50) continue;
+        if (analysisMode === 'indicators') {
+          const indicators = technicalService.analyzeIndicators(candles);
+          const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+          const signal = technicalService.generateSignal(
+            pair.symbol,
+            candles,
+            indicators,
+            btcCorrelation,
+            selectedTimeframe
+          );
+          if (signal && signal.confidence >= minConfidence) {
+            allSignals.push(signal);
+          }
+        } else {
+          // Apenas padrões de candles
+          const signal = technicalService.detectCandlePattern(candles, pair.symbol, selectedTimeframe);
+          if (signal) {
+            allSignals.push(signal);
+          }
+        }
+      }
+      // Ordena e limita os sinais
+      const sortedSignals = allSignals
+>>>>>>> origin/main-forcada
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, maxSignals);
       
@@ -142,6 +181,7 @@ export function Dashboard() {
     if (isGenerating || !selectedSymbol) return;
     setIsGenerating(true);
     try {
+<<<<<<< HEAD
       const btcCandles = await binanceService.getKlineData('BTCUSDT', selectedTimeframe);
       const raw = await binanceService.getKlineData(selectedSymbol, selectedTimeframe);
       const candles = raw;
@@ -157,6 +197,37 @@ export function Dashboard() {
       );
       if (signal && signal.confidence >= MIN_CONFIDENCE) {
         setSignals(prev => [signal, ...prev].slice(0, 100));
+=======
+      const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
+      const candles = await binanceService.getAllKlineData(selectedSymbol, selectedTimeframe);
+      if (!candles || candles.length < 50) {
+        setSignalError('Não há candles suficientes para gerar sinal nesta moeda/timeframe.');
+        return;
+      }
+      if (analysisMode === 'indicators') {
+        const indicators = technicalService.analyzeIndicators(candles);
+        const btcCorrelation = technicalService.calculateBTCCorrelation(candles, btcCandles);
+        const signal = technicalService.generateSignal(
+          selectedSymbol,
+          candles,
+          indicators,
+          btcCorrelation,
+          selectedTimeframe
+        );
+        if (signal && signal.confidence >= minConfidence) {
+          setSignals(prev => [signal, ...prev].slice(0, 100));
+        } else {
+          setSignalError('Não foi possível gerar sinal para esta moeda/timeframe com a confiança mínima definida.');
+        }
+      } else {
+        // Apenas padrões de candles
+        const signal = technicalService.detectCandlePattern(candles, selectedSymbol, selectedTimeframe);
+        if (signal) {
+          setSignals(prev => [signal, ...prev].slice(0, 100));
+        } else {
+          setSignalError('Nenhum padrão de candle relevante detectado para este timeframe.');
+        }
+>>>>>>> origin/main-forcada
       }
     } catch (e) {
       console.error('Error generating single symbol signal:', e);
@@ -234,7 +305,18 @@ export function Dashboard() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Análise</label>
+              <select
+                value={analysisMode}
+                onChange={e => setAnalysisMode(e.target.value as 'candles' | 'indicators')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="indicators">Indicadores + Candles</option>
+                <option value="candles">Somente Candles</option>
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Timeframe</label>
               <select
