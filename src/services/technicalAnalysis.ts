@@ -1,6 +1,188 @@
+  // Detecta padrões simples de candles (exemplo: martelo, engolfo de alta/baixa)
+  detectCandlePattern(candles: Candle[]): { type: 'BUY' | 'SELL' | null, pattern: string | null } {
+    if (candles.length < 2) return { type: null, pattern: null };
+    const last = candles[candles.length - 1];
+    const prev = candles[candles.length - 2];
+    // Martelo (Hammer)
+    const body = Math.abs(last.close - last.open);
+    const candleSize = last.high - last.low;
+    const lowerShadow = last.open < last.close ? last.open - last.low : last.close - last.low;
+    const upperShadow = last.high - (last.open > last.close ? last.open : last.close);
+    if (
+      body < candleSize * 0.4 &&
+      lowerShadow > body * 2 &&
+      upperShadow < body
+    ) {
+      return { type: 'BUY', pattern: 'Martelo' };
+    }
+    // Engolfo de alta (Bullish Engulfing)
+    if (
+      prev.close < prev.open &&
+      last.close > last.open &&
+      last.open < prev.close &&
+      last.close > prev.open
+    ) {
+      return { type: 'BUY', pattern: 'Engolfo de Alta' };
+    }
+    // Engolfo de baixa (Bearish Engulfing)
+    if (
+      prev.close > prev.open &&
+      last.close < last.open &&
+      last.open > prev.close &&
+      last.close < prev.open
+    ) {
+      return { type: 'SELL', pattern: 'Engolfo de Baixa' };
+    }
+    // Doji
+    if (body < candleSize * 0.1) {
+      return { type: null, pattern: 'Doji' };
+    }
+    return { type: null, pattern: null };
+  }
+
 import { Candle, TechnicalIndicators, Signal } from '../types';
 
 export class TechnicalAnalysisService {
+  // Detecta padrões simples de candles (exemplo: martelo, engolfo de alta/baixa)
+  detectCandlePattern(candles: Candle[], symbol: string, timeframe: string): Signal | null {
+    if (candles.length < 5) return null;
+    // Percorre toda a janela de candles para buscar padrões
+    for (let i = 4; i < candles.length; i++) {
+      const last = candles[i];
+      const prev = candles[i - 1];
+      let type: 'BUY' | 'SELL' | null = null;
+      let pattern: string | null = null;
+      // Martelo (Hammer)
+      const body = Math.abs(last.close - last.open);
+      const candleSize = last.high - last.low;
+      const lowerShadow = last.open < last.close ? last.open - last.low : last.close - last.low;
+      const upperShadow = last.high - (last.open > last.close ? last.open : last.close);
+      if (
+        body < candleSize * 0.4 &&
+        lowerShadow > body * 2 &&
+        upperShadow < body
+      ) {
+        type = 'BUY';
+        pattern = 'Martelo';
+      }
+      // Engolfo de alta (Bullish Engulfing)
+      else if (
+        prev.close < prev.open &&
+        last.close > last.open &&
+        last.open < prev.close &&
+        last.close > prev.open
+      ) {
+        type = 'BUY';
+        pattern = 'Engolfo de Alta';
+      }
+      // Engolfo de baixa (Bearish Engulfing)
+      else if (
+        prev.close > prev.open &&
+        last.close < last.open &&
+        last.open > prev.close &&
+        last.close < prev.open
+      ) {
+        type = 'SELL';
+        pattern = 'Engolfo de Baixa';
+      }
+      // Doji
+      else if (body < candleSize * 0.1) {
+        pattern = 'Doji';
+      }
+      // Topo duplo
+      if (!type && i >= 4) {
+        const high1 = candles[i - 4].high;
+        const high2 = candles[i - 2].high;
+        const highNow = last.high;
+        if (Math.abs(high1 - high2) / high1 < 0.01 && Math.abs(high2 - highNow) / high2 < 0.01) {
+          type = 'SELL';
+          pattern = 'Topo Duplo';
+        }
+      }
+      // Fundo duplo (suporte duplo)
+      if (!type && i >= 4) {
+        const low1 = candles[i - 4].low;
+        const low2 = candles[i - 2].low;
+        const lowNow = last.low;
+        if (Math.abs(low1 - low2) / low1 < 0.01 && Math.abs(low2 - lowNow) / low2 < 0.01) {
+          type = 'BUY';
+          pattern = 'Fundo Duplo';
+        }
+      }
+      // Triângulo ascendente
+      if (!type && i >= 4) {
+        const c = candles.slice(i - 4, i + 1);
+        const highs = c.map(x => x.high);
+        const lows = c.map(x => x.low);
+        const maxHigh = Math.max(...highs);
+        const minHigh = Math.min(...highs);
+        // topo horizontal e fundos ascendentes
+        if (maxHigh - minHigh < maxHigh * 0.005 && lows[4] > lows[0] && lows[3] > lows[1]) {
+          type = 'BUY';
+          pattern = 'Triângulo Ascendente';
+        }
+      }
+      // Triângulo descendente
+      if (!type && i >= 4) {
+        const c = candles.slice(i - 4, i + 1);
+        const highs = c.map(x => x.high);
+        const lows = c.map(x => x.low);
+        const maxLow = Math.max(...lows);
+        const minLow = Math.min(...lows);
+        // fundo horizontal e topos descendentes
+        if (maxLow - minLow < maxLow * 0.005 && highs[4] < highs[0] && highs[3] < highs[1]) {
+          type = 'SELL';
+          pattern = 'Triângulo Descendente';
+        }
+      }
+      // RSI sobrevendido tocando zero
+      if (!type && i >= 14) {
+        const closes = candles.slice(i - 14, i + 1).map(c => c.close);
+        const rsi = this.calculateRSI(closes, 14);
+        if (rsi < 10) {
+          type = 'BUY';
+          pattern = 'RSI Sobrevendido';
+        }
+      }
+      if (type) {
+        // Parâmetros do trade
+        const entryPrice = last.close;
+        const targetPercent = type === 'BUY' ? 0.015 : -0.015;
+        const stopPercent = type === 'BUY' ? -0.01 : 0.01;
+        const targetPrice = entryPrice * (1 + targetPercent);
+        const stopLoss = entryPrice * (1 + stopPercent);
+        // Indicadores neutros para compatibilidade
+        const emptyIndicators: TechnicalIndicators = {
+          ema12: entryPrice,
+          ema26: entryPrice,
+          ema50: entryPrice,
+          rsi: 50,
+          stochastic: { k: 50, d: 50 },
+          bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+          macd: { macd: 0, signal: 0, histogram: 0 },
+          volatility: 0,
+          volumeProfile: 1
+        };
+        return {
+          id: `${symbol}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type,
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 70,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs(targetPercent * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: `Padrão de candle detectado: ${pattern}`
+        };
+      }
+    }
+    return null;
+  }
   calculateSMA(prices: number[], period: number): number {
     if (prices.length < period) return prices[prices.length - 1];
     const recentPrices = prices.slice(-period);
