@@ -1,9 +1,20 @@
 
+
 import { CryptoPair, Candle, Timeframe } from '../types';
 
 const BINANCE_API_BASE = 'https://api.binance.com/api/v3';
 
 export class BinanceService {
+  public async getTickerPrice(symbol: string): Promise<{ price: string }> {
+    try {
+      const response = await fetch(`${BINANCE_API_BASE}/ticker/price?symbol=${symbol}`);
+      const data = await response.json();
+      return { price: data.price };
+    } catch (error) {
+      console.error('Error fetching ticker price:', error);
+      return { price: '0' };
+    }
+  }
   private static instance: BinanceService;
 
   public static getInstance(): BinanceService {

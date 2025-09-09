@@ -58,7 +58,21 @@ export const TradingViewWidget: React.FC<TradingViewWidgetProps> = ({ symbol, in
           hide_top_toolbar: false,
           hide_legend: false,
           save_image: false,
-          container_id: widgetId
+          container_id: widgetId,
+          // FULL-FEATURED
+          width: '100%',
+          height: '100%',
+          allow_symbol_change: true,
+          details: true,
+          hotlist: true,
+          calendar: true,
+          studies: [],
+          withdateranges: true,
+          show_popup_button: true,
+          popup_width: '1000',
+          popup_height: '650',
+          // Mostra barra de busca
+          hide_side_toolbar: false,
         });
       }
     };

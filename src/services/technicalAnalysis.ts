@@ -1,145 +1,409 @@
 import { Candle, TechnicalIndicators, Signal } from '../types';
 
 export class TechnicalAnalysisService {
+  private _indicatorsSummary(ind: TechnicalIndicators): string {
+    return ` | EMA12: ${ind.ema12?.toFixed(2)}, EMA26: ${ind.ema26?.toFixed(2)}, EMA50: ${ind.ema50?.toFixed(2)} | RSI: ${ind.rsi?.toFixed(1)} | Stoch: K=${ind.stochastic?.k?.toFixed(1)}, D=${ind.stochastic?.d?.toFixed(1)} | BB: [${ind.bollingerBands?.lower?.toFixed(2)}, ${ind.bollingerBands?.middle?.toFixed(2)}, ${ind.bollingerBands?.upper?.toFixed(2)}] | MACD: ${ind.macd?.macd?.toFixed(2)}, Sinal: ${ind.macd?.signal?.toFixed(2)}, Hist: ${ind.macd?.histogram?.toFixed(2)} | Volatilidade: ${ind.volatility?.toFixed(2)}`;
+  }
   // Detecta padrões simples de candles (exemplo: martelo, engolfo de alta/baixa)
-  detectCandlePattern(candles: Candle[], symbol: string, timeframe: string): Signal | null {
-    if (candles.length < 5) return null;
-    // Percorre toda a janela de candles para buscar padrões
-    for (let i = 4; i < candles.length; i++) {
-      const last = candles[i];
-      const prev = candles[i - 1];
-      let type: 'BUY' | 'SELL' | null = null;
-      let pattern: string | null = null;
-      // Martelo (Hammer)
-      const body = Math.abs(last.close - last.open);
-      const candleSize = last.high - last.low;
-      const lowerShadow = last.open < last.close ? last.open - last.low : last.close - last.low;
-      const upperShadow = last.high - (last.open > last.close ? last.open : last.close);
-      if (
-        body < candleSize * 0.4 &&
-        lowerShadow > body * 2 &&
-        upperShadow < body
-      ) {
-        type = 'BUY';
-        pattern = 'Martelo';
-      }
-      // Engolfo de alta (Bullish Engulfing)
-      else if (
-        prev.close < prev.open &&
-        last.close > last.open &&
-        last.open < prev.close &&
-        last.close > prev.open
-      ) {
-        type = 'BUY';
-        pattern = 'Engolfo de Alta';
-      }
-      // Engolfo de baixa (Bearish Engulfing)
-      else if (
-        prev.close > prev.open &&
-        last.close < last.open &&
-        last.open > prev.close &&
-        last.close < prev.open
-      ) {
-        type = 'SELL';
-        pattern = 'Engolfo de Baixa';
-      }
-      // Doji
-      else if (body < candleSize * 0.1) {
-        pattern = 'Doji';
-      }
-      // Topo duplo
-      if (!type && i >= 4) {
-        const high1 = candles[i - 4].high;
-        const high2 = candles[i - 2].high;
-        const highNow = last.high;
-        if (Math.abs(high1 - high2) / high1 < 0.01 && Math.abs(high2 - highNow) / high2 < 0.01) {
-          type = 'SELL';
-          pattern = 'Topo Duplo';
-        }
-      }
-      // Fundo duplo (suporte duplo)
-      if (!type && i >= 4) {
-        const low1 = candles[i - 4].low;
-        const low2 = candles[i - 2].low;
-        const lowNow = last.low;
-        if (Math.abs(low1 - low2) / low1 < 0.01 && Math.abs(low2 - lowNow) / low2 < 0.01) {
-          type = 'BUY';
-          pattern = 'Fundo Duplo';
-        }
-      }
-      // Triângulo ascendente
-      if (!type && i >= 4) {
-        const c = candles.slice(i - 4, i + 1);
-        const highs = c.map(x => x.high);
-        const lows = c.map(x => x.low);
-        const maxHigh = Math.max(...highs);
-        const minHigh = Math.min(...highs);
-        // topo horizontal e fundos ascendentes
-        if (maxHigh - minHigh < maxHigh * 0.005 && lows[4] > lows[0] && lows[3] > lows[1]) {
-          type = 'BUY';
-          pattern = 'Triângulo Ascendente';
-        }
-      }
-      // Triângulo descendente
-      if (!type && i >= 4) {
-        const c = candles.slice(i - 4, i + 1);
-        const highs = c.map(x => x.high);
-        const lows = c.map(x => x.low);
-        const maxLow = Math.max(...lows);
-        const minLow = Math.min(...lows);
-        // fundo horizontal e topos descendentes
-        if (maxLow - minLow < maxLow * 0.005 && highs[4] < highs[0] && highs[3] < highs[1]) {
-          type = 'SELL';
-          pattern = 'Triângulo Descendente';
-        }
-      }
-      // RSI sobrevendido tocando zero
-      if (!type && i >= 14) {
-        const closes = candles.slice(i - 14, i + 1).map(c => c.close);
-        const rsi = this.calculateRSI(closes, 14);
-        if (rsi < 10) {
-          type = 'BUY';
-          pattern = 'RSI Sobrevendido';
-        }
-      }
-      if (type) {
-        // Parâmetros do trade
-        const entryPrice = last.close;
-        const targetPercent = type === 'BUY' ? 0.015 : -0.015;
-        const stopPercent = type === 'BUY' ? -0.01 : 0.01;
-        const targetPrice = entryPrice * (1 + targetPercent);
-        const stopLoss = entryPrice * (1 + stopPercent);
-        // Indicadores neutros para compatibilidade
-        const emptyIndicators: TechnicalIndicators = {
-          ema12: entryPrice,
-          ema26: entryPrice,
-          ema50: entryPrice,
-          rsi: 50,
-          stochastic: { k: 50, d: 50 },
-          bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
-          macd: { macd: 0, signal: 0, histogram: 0 },
-          volatility: 0,
-          volumeProfile: 1
-        };
-        return {
-          id: `${symbol}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+  detectCandlePattern(candles: Candle[], symbol: string, timeframe: string, minConfidence: number): Signal[] {
+    if (candles.length < 5) return [];
+    // Cálculo do tamanho/volume médio dos candles
+    const avgCandleSize = candles.reduce((sum, c) => sum + (c.high - c.low), 0) / candles.length;
+    const avgVolume = candles.reduce((sum, c) => sum + c.volume, 0) / candles.length;
+    // Ajuste do target/stop conforme timeframe e tamanho/volume
+    const stablecoins = ['USDCUSDT', 'BUSDUSDT', 'USDTUSDT', 'TUSDUSDT', 'USDPUSDT', 'DAIUSDT', 'FDUSDUSDT', 'EURUSDT', 'USDEUSDT'];
+    const isStable = stablecoins.includes(symbol.toUpperCase());
+    const timeframeTargetMap: Record<string, number> = {
+      '1m': 0.01, '3m': 0.012, '5m': 0.015, '15m': 0.018, '30m': 0.02,
+      '1h': 0.025, '2h': 0.03, '4h': 0.04, '6h': 0.05, '8h': 0.06, '12h': 0.07,
+      '1d': 0.10, '3d': 0.15, '1w': 0.20, '1M': 0.30
+    };
+    const timeframeStopMap: Record<string, number> = {
+      '1m': 0.008, '3m': 0.01, '5m': 0.012, '15m': 0.014, '30m': 0.015,
+      '1h': 0.018, '2h': 0.02, '4h': 0.025, '6h': 0.03, '8h': 0.035, '12h': 0.04,
+      '1d': 0.05, '3d': 0.07, '1w': 0.10, '1M': 0.15
+    };
+    let baseTargetPercent = timeframeTargetMap[timeframe] ?? 0.02;
+    let baseStopPercent = timeframeStopMap[timeframe] ?? 0.015;
+    // Limite para stablecoins: máximo 2%
+    if (isStable) {
+      baseTargetPercent = Math.min(baseTargetPercent, 0.02);
+      baseStopPercent = Math.min(baseStopPercent, 0.02);
+    }
+    // Ajuste extra pelo tamanho/volume
+    const sizeMultiplier = Math.min(avgCandleSize / (candles[0].close * 0.01), 3); // candle médio em relação a 1% do preço
+    const volumeMultiplier = Math.min(avgVolume / (candles[0].volume || 1), 3);
+    let targetPercent = baseTargetPercent * (1 + 0.2 * sizeMultiplier + 0.1 * volumeMultiplier);
+    let stopPercent = baseStopPercent * (1 + 0.2 * sizeMultiplier);
+    // Limite final para stablecoins: nunca maior que 2%
+    if (isStable) {
+      targetPercent = Math.min(targetPercent, 0.02);
+      stopPercent = Math.min(stopPercent, 0.02);
+    }
+    // Analisa a janela inteira, não candle a candle
+    const signals: Signal[] = [];
+    // Martelo (Hammer) - busca se existe pelo menos um martelo na janela
+    const hammerIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const body = Math.abs(c.close - c.open);
+      const candleSize = c.high - c.low;
+      const lowerShadow = c.open < c.close ? c.open - c.low : c.close - c.low;
+      const upperShadow = c.high - (c.open > c.close ? c.open : c.close);
+      return body < candleSize * 0.4 && lowerShadow > body * 2 && upperShadow < body;
+    });
+    if (hammerIdx !== -1) {
+  const c = candles[hammerIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 + Math.abs(targetPercent));
+  let stopLoss = entryPrice * (1 - Math.abs(stopPercent));
+  // Coerência global
+  if (targetPrice <= entryPrice) targetPrice = entryPrice * 1.02;
+  if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (65 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-hammer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           symbol,
-          type,
+          type: 'BUY',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 65,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: 'Martelo detectado. Possível reversão de tendência.' + this._indicatorsSummary(emptyIndicators)
+        });
+      }
+    }
+    // Engolfo de Alta
+    const bullishIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const prev = candles[i - 1];
+      return prev.close < prev.open && c.close > c.open && c.open < prev.close && c.close > prev.open;
+    });
+    if (bullishIdx !== -1) {
+      const c = candles[bullishIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 + Math.abs(targetPercent));
+  let stopLoss = entryPrice * (1 - Math.abs(stopPercent));
+  if (targetPrice <= entryPrice) targetPrice = entryPrice * 1.02;
+  if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (70 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-bullish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'BUY',
           entryPrice,
           targetPrice,
           stopLoss,
           confidence: 70,
           timestamp: new Date(),
           timeframe,
-          expectedGain: Math.abs(targetPercent * 100),
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
           btcCorrelation: 0,
           status: 'PENDING',
           indicators: emptyIndicators,
-          reason: `Padrão de candle detectado: ${pattern}`
-        };
+          reason: 'Engolfo de Alta detectado. Possível reversão para alta.' + this._indicatorsSummary(emptyIndicators)
+        });
       }
     }
-    return null;
+    // Engolfo de Baixa
+    const bearishIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const prev = candles[i - 1];
+      return prev.close > prev.open && c.close < c.open && c.open > prev.close && c.close < prev.open;
+    });
+    if (bearishIdx !== -1) {
+      const c = candles[bearishIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 - Math.abs(targetPercent));
+  let stopLoss = entryPrice * (1 + Math.abs(stopPercent));
+  if (targetPrice >= entryPrice) targetPrice = entryPrice * 0.98;
+  if (stopLoss <= entryPrice) stopLoss = entryPrice * 1.02;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (70 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-bearish-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'SELL',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 70,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: 'Engolfo de Baixa detectado. Possível reversão para baixa.' + this._indicatorsSummary(emptyIndicators)
+        });
+      }
+    }
+    // Topo Duplo
+    const topoIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const high1 = candles[i - 4].high;
+      const high2 = candles[i - 2].high;
+      const highNow = c.high;
+      return Math.abs(high1 - high2) / high1 < 0.01 && Math.abs(high2 - highNow) / high2 < 0.01;
+    });
+    if (topoIdx !== -1) {
+      const c = candles[topoIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 - Math.abs(targetPercent));
+  let stopLoss = entryPrice * (1 + Math.abs(stopPercent));
+  if (targetPrice >= entryPrice) targetPrice = entryPrice * 0.98;
+  if (stopLoss <= entryPrice) stopLoss = entryPrice * 1.02;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (80 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-topo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'SELL',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 80,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: 'Topo Duplo detectado. Possível reversão para baixa.' + this._indicatorsSummary(emptyIndicators)
+        });
+      }
+    }
+    // Fundo Duplo
+    const fundoIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const low1 = candles[i - 4].low;
+      const low2 = candles[i - 2].low;
+      const lowNow = c.low;
+      return Math.abs(low1 - low2) / low1 < 0.01 && Math.abs(low2 - lowNow) / low2 < 0.01;
+    });
+    if (fundoIdx !== -1) {
+      const c = candles[fundoIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 + Math.abs(targetPercent));
+  let stopLoss = entryPrice * (1 - Math.abs(stopPercent));
+  if (targetPrice <= entryPrice) targetPrice = entryPrice * 1.02;
+  if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (80 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-fundo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'BUY',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 80,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: 'Fundo Duplo detectado. Possível reversão para alta.' + this._indicatorsSummary(emptyIndicators)
+        });
+      }
+    }
+    // Triângulo Ascendente
+    const triAscIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const cands = candles.slice(i - 4, i + 1);
+      const highs = cands.map(x => x.high);
+      const lows = cands.map(x => x.low);
+      const maxHigh = Math.max(...highs);
+      const minHigh = Math.min(...highs);
+      return maxHigh - minHigh < maxHigh * 0.005 && lows[4] > lows[0] && lows[3] > lows[1];
+    });
+    if (triAscIdx !== -1) {
+      const c = candles[triAscIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 + targetPercent);
+  let stopLoss = entryPrice * (1 - stopPercent);
+  if (targetPrice <= entryPrice) targetPrice = entryPrice * 1.02;
+  if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (75 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-triAsc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'BUY',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 75,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: `Padrão de candle detectado: Triângulo Ascendente`
+        });
+      }
+    }
+    // Triângulo Descendente
+    const triDescIdx = candles.findIndex((c, i) => {
+      if (i < 4) return false;
+      const cands = candles.slice(i - 4, i + 1);
+      const highs = cands.map(x => x.high);
+      const lows = cands.map(x => x.low);
+      const maxLow = Math.max(...lows);
+      const minLow = Math.min(...lows);
+      return maxLow - minLow < maxLow * 0.005 && highs[4] < highs[0] && highs[3] < highs[1];
+    });
+    if (triDescIdx !== -1) {
+      const c = candles[triDescIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 - targetPercent);
+  let stopLoss = entryPrice * (1 + stopPercent);
+  if (targetPrice >= entryPrice) targetPrice = entryPrice * 0.98;
+  if (stopLoss <= entryPrice) stopLoss = entryPrice * 1.02;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (75 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-triDesc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'SELL',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 75,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: `Padrão de candle detectado: Triângulo Descendente`
+        });
+      }
+    }
+    // RSI Sobrevendido
+    const rsiIdx = candles.findIndex((c, i) => {
+      if (i < 14) return false;
+      const closes = candles.slice(i - 14, i + 1).map(c => c.close);
+      const rsi = this.calculateRSI(closes, 14);
+      return rsi < 10;
+    });
+    if (rsiIdx !== -1) {
+  const c = candles[rsiIdx];
+  const entryPrice = c.close;
+  let targetPrice = entryPrice * (1 + targetPercent);
+  let stopLoss = entryPrice * (1 - stopPercent);
+  if (targetPrice <= entryPrice) targetPrice = entryPrice * 1.02;
+  if (stopLoss >= entryPrice) stopLoss = entryPrice * 0.98;
+      const emptyIndicators: TechnicalIndicators = {
+        ema12: entryPrice,
+        ema26: entryPrice,
+        ema50: entryPrice,
+        rsi: 50,
+        stochastic: { k: 50, d: 50 },
+        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
+        macd: { macd: 0, signal: 0, histogram: 0 },
+        volatility: 0,
+        volumeProfile: 1
+      };
+      if (60 >= minConfidence) {
+        signals.push({
+          id: `${symbol}-rsi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          symbol,
+          type: 'BUY',
+          entryPrice,
+          targetPrice,
+          stopLoss,
+          confidence: 60,
+          timestamp: new Date(),
+          timeframe,
+          expectedGain: Math.abs((targetPrice - entryPrice) / entryPrice * 100),
+          btcCorrelation: 0,
+          status: 'PENDING',
+          indicators: emptyIndicators,
+          reason: `Padrão de candle detectado: RSI Sobrevendido`
+        });
+      }
+    }
+    return signals;
   }
   calculateSMA(prices: number[], period: number): number {
     if (prices.length < period) return prices[prices.length - 1];
@@ -308,145 +572,75 @@ export class TechnicalAnalysisService {
     timeframe: string
   ): Signal | null {
     if (candles.length < 50) return null; // Need enough data for accurate analysis
-    
+
     const currentPrice = candles[candles.length - 1].close;
     const prevPrice = candles[candles.length - 2].close;
     const priceChange = (currentPrice - prevPrice) / prevPrice * 100;
-    
-  let signalType: 'BUY' | 'SELL' | null = null;
-  let confidence = 0;
-  const reasons: string[] = [];
-    
-    // Advanced EMA Analysis
+
+    let signalType: 'BUY' | 'SELL' | null = null;
+    let confidence = 0;
+    const reasons: string[] = [];
+
+    // Critérios de confluência
+    let criteriaMet = 0;
+    let totalCriteria = 0;
+
+    // EMA
+    totalCriteria++;
     const emaAlignment = indicators.ema12 > indicators.ema26 && indicators.ema26 > indicators.ema50;
     const emaBearish = indicators.ema12 < indicators.ema26 && indicators.ema26 < indicators.ema50;
-    
     if (emaAlignment) {
-      confidence += 25;
+      criteriaMet++;
       signalType = 'BUY';
       reasons.push('Alinhamento altista das EMAs (12>26>50)');
     } else if (emaBearish) {
-      confidence += 25;
+      criteriaMet++;
       signalType = 'SELL';
       reasons.push('Alinhamento baixista das EMAs (12<26<50)');
     }
-    
-    // Enhanced RSI Analysis
+
+    // RSI
+    totalCriteria++;
     if (indicators.rsi < 25) {
-      confidence += 30;
+      criteriaMet++;
       if (signalType !== 'SELL') signalType = 'BUY';
       reasons.push(`RSI extremamente sobrevendido (${indicators.rsi.toFixed(1)})`);
     } else if (indicators.rsi > 75) {
-      confidence += 30;
+      criteriaMet++;
       if (signalType !== 'BUY') signalType = 'SELL';
       reasons.push(`RSI extremamente sobrecomprado (${indicators.rsi.toFixed(1)})`);
-    } else if (indicators.rsi < 35 && signalType === 'BUY') {
-      confidence += 15;
-      reasons.push(`RSI sugere suporte (sobrevendido) (${indicators.rsi.toFixed(1)})`);
-    } else if (indicators.rsi > 65 && signalType === 'SELL') {
-      confidence += 15;
-      reasons.push(`RSI sugere resistência (sobrecomprado) (${indicators.rsi.toFixed(1)})`);
     }
-    
-    // Advanced Stochastic Analysis
-    const stochOversold = indicators.stochastic.k < 20 && indicators.stochastic.d < 20;
-    const stochOverbought = indicators.stochastic.k > 80 && indicators.stochastic.d > 80;
-    const stochBullishCross = indicators.stochastic.k > indicators.stochastic.d && indicators.stochastic.k < 50;
-    const stochBearishCross = indicators.stochastic.k < indicators.stochastic.d && indicators.stochastic.k > 50;
-    
-    if (stochOversold) {
-      confidence += 20;
-      if (signalType !== 'SELL') signalType = 'BUY';
-      reasons.push('Estocástico em zona de sobrevenda');
-    } else if (stochOverbought) {
-      confidence += 20;
-      if (signalType !== 'BUY') signalType = 'SELL';
-      reasons.push('Estocástico em zona de sobrecompra');
-    } else if (stochBullishCross && signalType === 'BUY') {
-      confidence += 15;
-      reasons.push('Cruzamento altista do Estocástico');
-    } else if (stochBearishCross && signalType === 'SELL') {
-      confidence += 15;
-      reasons.push('Cruzamento baixista do Estocástico');
-    }
-    
-    // Bollinger Bands Analysis
-    const bbPosition = (currentPrice - indicators.bollingerBands.lower) / 
-                      (indicators.bollingerBands.upper - indicators.bollingerBands.lower);
-    
-    if (bbPosition <= 0.1) {
-      confidence += 25;
-      if (signalType !== 'SELL') signalType = 'BUY';
-      reasons.push('Preço na banda inferior de Bollinger');
-    } else if (bbPosition >= 0.9) {
-      confidence += 25;
-      if (signalType !== 'BUY') signalType = 'SELL';
-      reasons.push('Preço na banda superior de Bollinger');
-    }
-    
-    // MACD Analysis
+
+    // MACD
+    totalCriteria++;
     const macdBullish = indicators.macd.macd > indicators.macd.signal && indicators.macd.histogram > 0;
     const macdBearish = indicators.macd.macd < indicators.macd.signal && indicators.macd.histogram < 0;
-    
     if (macdBullish && signalType === 'BUY') {
-      confidence += 20;
+      criteriaMet++;
       reasons.push('Sinal altista do MACD');
     } else if (macdBearish && signalType === 'SELL') {
-      confidence += 20;
+      criteriaMet++;
       reasons.push('Sinal baixista do MACD');
     }
-    
-    // Volume Analysis
+
+    // Volume
+    totalCriteria++;
     if (indicators.volumeProfile > 1.5) {
-      confidence += 15;
+      criteriaMet++;
       reasons.push(`Confirmação por alto volume (${indicators.volumeProfile.toFixed(1)}x média)`);
-    } else if (indicators.volumeProfile < 0.5) {
-      confidence -= 10;
-      reasons.push('Aviso: volume baixo');
     }
-    
-    // Volatility Analysis
-    if (indicators.volatility > 100) {
-      confidence -= 15;
-      reasons.push('Risco: volatilidade elevada');
-    } else if (indicators.volatility < 30) {
-      confidence += 10;
-      reasons.push('Ambiente de baixa volatilidade');
-    }
-    
-    // BTC Correlation Analysis
-    if (Math.abs(btcCorrelation) > 0.8) {
-      confidence += 15;
-      reasons.push(`Forte correlação com o BTC (${(btcCorrelation * 100).toFixed(1)}%)`);
-    } else if (Math.abs(btcCorrelation) < 0.3) {
-      confidence += 10;
-      reasons.push('Movimento independente do BTC');
-    }
-    
-    // Price Action Analysis
+
+    // Price Action (momentum)
+    totalCriteria++;
     const momentum = Math.abs(priceChange);
-  if (momentum > 2) {
-      if ((priceChange > 0 && signalType === 'BUY') || (priceChange < 0 && signalType === 'SELL')) {
-        confidence += 15;
-    reasons.push(`Momentum forte (${priceChange.toFixed(2)}%)`);
-      } else {
-        confidence -= 10;
-    reasons.push('Momentum conflitante');
-      }
+    if (momentum > 2) {
+      criteriaMet++;
+      reasons.push(`Momentum forte (${priceChange.toFixed(2)}%)`);
     }
-    
-    // Multi-timeframe confirmation (simulated)
-    const trendStrength = this.calculateTrendStrength(candles);
-    if (trendStrength > 0.7 && signalType === 'BUY') {
-      confidence += 20;
-      reasons.push('Confirmação de forte tendência de alta');
-    } else if (trendStrength < -0.7 && signalType === 'SELL') {
-      confidence += 20;
-      reasons.push('Confirmação de forte tendência de baixa');
-    }
-    
-    // Minimum confidence threshold
-    if (!signalType || confidence < 65) return null;
+
+    // Score dinâmico: cada critério vale 20 pontos
+    confidence = Math.min(20 * criteriaMet, 95);
+    if (confidence < 60 || !signalType) return null;
     
     // Ajusta o alvo conforme o timeframe
     const timeframeTargetMap: Record<string, number> = {
@@ -465,18 +659,23 @@ export class TechnicalAnalysisService {
     const volatilityMultiplier = Math.min(indicators.volatility / 50, 2);
     const targetPercent = baseTargetPercent + (volatilityMultiplier * 0.005);
     const stopPercent = baseStopPercent + (volatilityMultiplier * 0.003);
-    const targetMultiplier = signalType === 'BUY' ? (1 + targetPercent) : (1 - targetPercent);
-    const stopMultiplier = signalType === 'BUY' ? (1 - stopPercent) : (1 + stopPercent);
-    // Ensure target and stop are different from entry
-    const targetPrice = currentPrice * targetMultiplier;
-    const stopLoss = currentPrice * stopMultiplier;
-    
+    let targetMultiplier = signalType === 'BUY' ? (1 + targetPercent) : (1 - targetPercent);
+    let stopMultiplier = signalType === 'BUY' ? (1 - stopPercent) : (1 + stopPercent);
+    let targetPrice = currentPrice * targetMultiplier;
+    let stopLoss = currentPrice * stopMultiplier;
+    // Correção global: garantir coerência
+    if (signalType === 'BUY') {
+      if (targetPrice <= currentPrice) targetPrice = currentPrice * 1.02;
+      if (stopLoss >= currentPrice) stopLoss = currentPrice * 0.98;
+    } else if (signalType === 'SELL') {
+      if (targetPrice >= currentPrice) targetPrice = currentPrice * 0.98;
+      if (stopLoss <= currentPrice) stopLoss = currentPrice * 1.02;
+    }
     // Validate prices are different
     if (Math.abs(targetPrice - currentPrice) < currentPrice * 0.005 || 
         Math.abs(stopLoss - currentPrice) < currentPrice * 0.005) {
       return null; // Skip if prices are too close
     }
-    
     return {
       id: `${symbol}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       symbol,
