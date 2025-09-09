@@ -3,9 +3,9 @@ name: pages build and deployment
 on:
   push:
     branches:
-  - main
-  - main-forcada
-  - gh-pages
+      - main
+      - main-forcada
+      - gh-pages
 
 jobs:
   build:
