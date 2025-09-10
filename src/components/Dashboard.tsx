@@ -1,6 +1,19 @@
+  // Selecionar todos os sinais gerados
+  function handleSelectAllSignals(checked: boolean) {
+    if (checked) {
+      setSelectedSignals(filteredSignals.map((s: Signal) => s.id));
+    } else {
+      setSelectedSignals([]);
+    }
+  }
 
+  // Deletar selecionados dos sinais gerados
+  function handleDeleteSelectedSignals() {
+    setSignals((prev: Signal[]) => prev.filter((s: Signal) => !selectedSignals.includes(s.id)));
+    setSelectedSignals([]);
+  }
 import { useState, useEffect, useRef } from 'react';
-import { CryptoPair, Signal, Timeframe, ImageAnalysisResult } from '../types';
+import { CryptoPair, Signal, Timeframe } from '../types';
 import { BinanceService } from '../services/binanceApi';
 import { TechnicalAnalysisService } from '../services/technicalAnalysis';
 import { SignalCard } from './SignalCard';
@@ -10,6 +23,49 @@ import { ImageAnalysis } from './ImageAnalysis';
 import { Settings, RefreshCw, Filter } from 'lucide-react';
 
 export function Dashboard() {
+  // Estado para seleção de sinais
+  // Selecionar todos os sinais gerados
+  function handleSelectAllSignals(checked: boolean) {
+    if (checked) {
+      setSelectedSignals(filteredSignals.map((s: Signal) => s.id));
+    } else {
+      setSelectedSignals([]);
+    }
+  }
+
+  // Deletar selecionados dos sinais gerados
+  function handleDeleteSelectedSignals() {
+    setSignals((prev: Signal[]) => prev.filter((s: Signal) => !selectedSignals.includes(s.id)));
+    setSelectedSignals([]);
+  }
+  // Estado para seleção de sinais ativos
+  const [selectedActiveSignals, setSelectedActiveSignals] = useState<string[]>([]);
+
+  // Selecionar/desselecionar um sinal ativo
+  function handleSelectActiveSignal(id: string, checked: boolean) {
+    setSelectedActiveSignals((prev: string[]) => checked ? [...prev, id] : prev.filter((sid: string) => sid !== id));
+  }
+
+  // Selecionar todos os ativos
+  function handleSelectAllActiveSignals(checked: boolean) {
+    if (checked) {
+      setSelectedActiveSignals(activeSignals.map((s: Signal) => s.id));
+    } else {
+      setSelectedActiveSignals([]);
+    }
+  }
+
+  // Deletar selecionados ativos
+  function handleDeleteSelectedActiveSignals() {
+    setActiveSignals((prev: Signal[]) => prev.filter((s: Signal) => !selectedActiveSignals.includes(s.id)));
+    setSelectedActiveSignals([]);
+  }
+
+  // Deletar individual ativo
+  function handleDeleteActiveSignal(id: string) {
+    setActiveSignals((prev: Signal[]) => prev.filter((s: Signal) => s.id !== id));
+    setSelectedActiveSignals((prev: string[]) => prev.filter((sid: string) => sid !== id));
+  }
   // Ref para o gráfico
   const chartRef = useRef<HTMLDivElement>(null);
   // --- Estados do gerador de sinais ---
@@ -30,7 +86,10 @@ export function Dashboard() {
       return '';
     }
   });
-  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators'>('indicators');
+  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators' | 'bbUpperBreak' | 'bbMiddleBreak'>('indicators');
+
+  // Estado para seleção de sinais
+  const [selectedSignals, setSelectedSignals] = useState<string[]>([]);
 
   const binanceService = BinanceService.getInstance();
   const technicalService = new TechnicalAnalysisService();
@@ -59,9 +118,23 @@ export function Dashboard() {
     }
   };
 
-  const timeframeCandleMap: Record<Timeframe, number> = {
-    '1m': 10000, '3m': 10000, '5m': 10000, '15m': 10000, '30m': 10000, '1h': 10000, '2h': 10000, '4h': 10000, '6h': 10000, '8h': 10000, '12h': 10000, '1d': 5000, '3d': 5000, '1w': 5000, '1M': 5000
-  };
+  // --- Renderização ---
+
+
+  // Selecionar/desselecionar um sinal
+  function handleSelectSignal(id: string, checked: boolean) {
+    setSelectedSignals((prev: string[]) => checked ? [...prev, id] : prev.filter((sid: string) => sid !== id));
+  }
+
+
+  // Deletar individual
+
+  function handleDeleteSignal(id: string) {
+    setSignals((prev: Signal[]) => prev.filter((s: Signal) => s.id !== id));
+    setSelectedSignals((prev: string[]) => prev.filter((sid: string) => sid !== id));
+  }
+
+
 
   const generateSignals = async () => {
     if (isGenerating) return;
@@ -73,7 +146,7 @@ export function Dashboard() {
         currentPairs = await binanceService.getTop500USDTPairs();
         setPairs(currentPairs);
       }
-  const topPairs = currentPairs.slice(0, 100);
+      const topPairs = currentPairs.slice(0, 100);
       const allSignals: Signal[] = [];
       const btcCandles = await binanceService.getAllKlineData('BTCUSDT', selectedTimeframe);
       for (const pair of topPairs) {
@@ -92,10 +165,56 @@ export function Dashboard() {
           if (signal && signal.confidence >= minConfidence) {
             allSignals.push(signal);
           }
-        } else {
+        } else if (analysisMode === 'candles') {
           // Apenas padrões de candles
           const candleSignals = technicalService.detectCandlePattern(candles, pair.symbol, selectedTimeframe, minConfidence);
           allSignals.push(...candleSignals);
+        } else if (analysisMode === 'bbUpperBreak') {
+          // Sinal apenas se fechamento rompeu a banda superior da BB
+          const closes = candles.map(c => c.close);
+          const bb = technicalService.calculateBollingerBands(closes);
+          const lastCandle = candles[candles.length - 1];
+          if (lastCandle.close > bb.upper) {
+            allSignals.push({
+              id: `${pair.symbol}-bbupper-${Date.now()}`,
+              symbol: pair.symbol,
+              type: 'BUY',
+              entryPrice: lastCandle.close,
+              targetPrice: lastCandle.close * 1.02,
+              stopLoss: lastCandle.close * 0.98,
+              confidence: 100,
+              timestamp: new Date(),
+              timeframe: selectedTimeframe,
+              expectedGain: 2,
+              btcCorrelation: 0,
+              status: 'PENDING',
+              indicators: technicalService.analyzeIndicators(candles),
+              reason: 'Rompimento da banda superior da BB'
+            });
+          }
+        } else if (analysisMode === 'bbMiddleBreak') {
+          // Sinal apenas se fechamento rompeu a banda do meio (SMA20)
+          const closes = candles.map(c => c.close);
+          const bb = technicalService.calculateBollingerBands(closes);
+          const lastCandle = candles[candles.length - 1];
+          if (lastCandle.close > bb.middle) {
+            allSignals.push({
+              id: `${pair.symbol}-bbmiddle-${Date.now()}`,
+              symbol: pair.symbol,
+              type: 'BUY',
+              entryPrice: lastCandle.close,
+              targetPrice: lastCandle.close * 1.02,
+              stopLoss: lastCandle.close * 0.98,
+              confidence: 100,
+              timestamp: new Date(),
+              timeframe: selectedTimeframe,
+              expectedGain: 2,
+              btcCorrelation: 0,
+              status: 'PENDING',
+              indicators: technicalService.analyzeIndicators(candles),
+              reason: 'Rompimento da banda do meio da BB (SMA20)'
+            });
+          }
         }
       }
       // Ordena e limita os sinais
@@ -345,11 +464,13 @@ export function Dashboard() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Análise</label>
               <select
                 value={analysisMode}
-                onChange={e => setAnalysisMode(e.target.value as 'candles' | 'indicators')}
+                onChange={e => setAnalysisMode(e.target.value as any)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="indicators">Indicadores + Candles</option>
                 <option value="candles">Somente Candles</option>
+                <option value="bbUpperBreak">Rompimento Banda Superior BB</option>
+                <option value="bbMiddleBreak">Rompimento Banda do Meio BB (SMA20)</option>
               </select>
             </div>
             <div>
@@ -451,15 +572,34 @@ export function Dashboard() {
           </div>
         )}
 
-        {/* Signals Grid */}
-        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-6">
+        {/* Controles de seleção dos sinais gerados */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-2">
             <h2 className="text-xl font-bold text-gray-900">Sinais Gerados</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={selectedSignals.length === filteredSignals.length && filteredSignals.length > 0}
+                onChange={e => handleSelectAllSignals(e.target.checked)}
+                className="accent-blue-600"
+              />
+              Selecionar todos
+            </label>
+            <button
+              onClick={handleDeleteSelectedSignals}
+              disabled={selectedSignals.length === 0}
+              className="px-3 py-1 bg-red-500 text-white rounded disabled:opacity-50 text-sm hover:bg-red-600"
+            >Deletar selecionados</button>
+            <div className="flex items-center gap-2 text-sm text-gray-500 ml-4">
               <Filter className="w-4 h-4" />
               {filteredSignals.length} sinais
             </div>
           </div>
+          <div className="border-b border-gray-200 w-full"></div>
+        </div>
+
+        {/* Signals Grid */}
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
           {filteredSignals.length === 0 ? (
             <div className="text-center py-12">
               <Settings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -467,42 +607,11 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredSignals.map(signal => (
-                <SignalCard
-                  key={signal.id}
-                  signal={signal}
-                  onUpdateStatus={handleUpdateStatus}
-                  onClick={() => handleActivateSignal(signal)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Lista de sinais monitorados (ativos) */}
-        <div className="mb-6">
-          <h2 className="text-lg font-bold mb-2">Sinais Ativos</h2>
-          {activeSignals.length === 0 ? (
-            <div className="text-gray-500">Nenhum sinal sendo monitorado.</div>
-          ) : (
-            <ul className="space-y-2">
-              {activeSignals.map((signal: Signal) => {
-                // Função para formatar com o mesmo número de casas decimais do preço de entrada
-                const getDecimals = (num: number) => {
-                  const s = num.toString();
-                  if (s.includes('.')) return s.split('.')[1].length;
-                  return 0;
-                };
-                const dec = getDecimals(signal.entryPrice);
-                const fmt = (n: number) => n.toFixed(dec);
-                // Calcula a porcentagem de lucro/perda
-                const percent = signal.type === 'BUY'
-                  ? ((signal.targetPrice - signal.entryPrice) / signal.entryPrice) * 100
-                  : ((signal.entryPrice - signal.targetPrice) / signal.entryPrice) * 100;
-                const percentStr = `${percent > 0 ? '+' : ''}${percent.toFixed(2)}%`;
-                // Importa ícones
-                // Função para rolar até o gráfico e selecionar o símbolo
-                const handleScrollToChart = () => {
+              {filteredSignals.map(signal => {
+                const handleCardClick = () => {
+                  // Ativa o sinal (simula trade)
+                  handleActivateSignal(signal);
+                  // Seleciona o símbolo e rola para o gráfico
                   if (typeof window !== 'undefined' && chartRef.current) {
                     setSelectedSymbol(signal.symbol);
                     setTimeout(() => {
@@ -511,41 +620,112 @@ export function Dashboard() {
                   }
                 };
                 return (
-                  <li
+                  <SignalCard
                     key={signal.id}
-                    className="p-3 rounded border flex items-center justify-between bg-white shadow cursor-pointer hover:bg-gray-50 transition"
-                    onClick={handleScrollToChart}
-                  >
-                    <div className="flex items-center gap-2">
-                      {/* Ícone de compra/venda */}
-                      {signal.type === 'BUY' ? <BuyIcon /> : <SellIcon />}
-                      {/* Símbolo, tipo e timeframe */}
-                      <span className="font-bold">{signal.symbol}</span>
-                      <span className={signal.type === 'BUY' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                        {signal.type}
-                      </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 rounded px-2 py-0.5 ml-1">{signal.timeframe}</span>
-                      <span className="ml-2">| Entrada: {fmt(signal.entryPrice)} | Target: {fmt(signal.targetPrice)} | Stop: {fmt(signal.stopLoss)}</span>
-                    </div>
-                    {/* Status do sinal */}
-                    <span
-                      className={
-                        signal.status === 'WIN' ? 'text-green-600 font-bold mr-2' :
-                        signal.status === 'LOSS' ? 'text-red-600 font-bold mr-2' :
-                        signal.status === 'ACTIVE' ? 'text-blue-600 font-bold mr-2' :
-                        'text-gray-600 font-bold mr-2'
-                      }
-                    >
-                      {signal.status}
-                    </span>
-                    {/* Porcentagem de lucro/perda */}
-                    <span className={percent >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                      {percentStr}
-                    </span>
-                  </li>
+                    signal={signal}
+                    onUpdateStatus={handleUpdateStatus}
+                    onClick={handleCardClick}
+                    selected={selectedSignals.includes(signal.id)}
+                    onSelect={checked => handleSelectSignal(signal.id, checked)}
+                    onDelete={() => handleDeleteSignal(signal.id)}
+                  />
                 );
               })}
-            </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Lista de sinais monitorados (ativos) com seleção */}
+        <div className="mb-6">
+          <h2 className="text-lg font-bold mb-2">Sinais Ativos</h2>
+          {activeSignals.length === 0 ? (
+            <div className="text-gray-500">Nenhum sinal sendo monitorado.</div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-4 mb-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedActiveSignals.length === activeSignals.length && activeSignals.length > 0}
+                    onChange={e => handleSelectAllActiveSignals(e.target.checked)}
+                    className="accent-blue-600"
+                  />
+                  Selecionar todos
+                </label>
+                <button
+                  onClick={handleDeleteSelectedActiveSignals}
+                  disabled={selectedActiveSignals.length === 0}
+                  className="px-3 py-1 bg-red-500 text-white rounded disabled:opacity-50 text-sm hover:bg-red-600"
+                >Deletar selecionados</button>
+              </div>
+              <ul className="space-y-2">
+                {activeSignals.map((signal: Signal) => {
+                  const getDecimals = (num: number) => {
+                    const s = num.toString();
+                    if (s.includes('.')) return s.split('.')[1].length;
+                    return 0;
+                  };
+                  const dec = getDecimals(signal.entryPrice);
+                  const fmt = (n: number) => n.toFixed(dec);
+                  const percent = signal.type === 'BUY'
+                    ? ((signal.targetPrice - signal.entryPrice) / signal.entryPrice) * 100
+                    : ((signal.entryPrice - signal.targetPrice) / signal.entryPrice) * 100;
+                  const percentStr = `${percent > 0 ? '+' : ''}${percent.toFixed(2)}%`;
+                  const handleScrollToChart = () => {
+                    if (typeof window !== 'undefined' && chartRef.current) {
+                      setSelectedSymbol(signal.symbol);
+                      setTimeout(() => {
+                        chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 100);
+                    }
+                  };
+                  return (
+                    <li
+                      key={signal.id}
+                      className="p-3 rounded border flex items-center justify-between bg-white shadow cursor-pointer hover:bg-gray-50 transition"
+                      onClick={handleScrollToChart}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedActiveSignals.includes(signal.id)}
+                          onChange={e => handleSelectActiveSignal(signal.id, e.target.checked)}
+                          onClick={e => e.stopPropagation()}
+                          className="accent-blue-600"
+                        />
+                        {signal.type === 'BUY' ? <BuyIcon /> : <SellIcon />}
+                        <span className="font-bold">{signal.symbol}</span>
+                        <span className={signal.type === 'BUY' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                          {signal.type}
+                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 rounded px-2 py-0.5 ml-1">{signal.timeframe}</span>
+                        <span className="ml-2">| Entrada: {fmt(signal.entryPrice)} | Target: {fmt(signal.targetPrice)} | Stop: {fmt(signal.stopLoss)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            signal.status === 'WIN' ? 'text-green-600 font-bold mr-2' :
+                            signal.status === 'LOSS' ? 'text-red-600 font-bold mr-2' :
+                            signal.status === 'ACTIVE' ? 'text-blue-600 font-bold mr-2' :
+                            'text-gray-600 font-bold mr-2'
+                          }
+                        >
+                          {signal.status}
+                        </span>
+                        <span className={percent >= 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                          {percentStr}
+                        </span>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteActiveSignal(signal.id); }}
+                          className="ml-2 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs"
+                          title="Deletar sinal"
+                        >Excluir</button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </div>
       </div>

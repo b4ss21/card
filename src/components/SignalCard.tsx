@@ -6,9 +6,12 @@ interface SignalCardProps {
   signal: Signal;
   onUpdateStatus: (id: string, status: Signal['status']) => void;
   onClick?: () => void;
+  selected?: boolean;
+  onSelect?: (checked: boolean) => void;
+  onDelete?: () => void;
 }
 
-export function SignalCard({ signal, onUpdateStatus, onClick }: SignalCardProps) {
+export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, onSelect, onDelete }: SignalCardProps) {
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-green-600 bg-green-100';
     if (confidence >= 60) return 'text-yellow-600 bg-yellow-100';
@@ -30,11 +33,24 @@ export function SignalCard({ signal, onUpdateStatus, onClick }: SignalCardProps)
 
   return (
     <div
-      className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+      className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300 cursor-pointer group"
       onClick={onClick}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
+          {/* Checkbox de seleção sempre visível à esquerda */}
+          <div className="flex items-center mr-2">
+            {onSelect && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={e => onSelect(e.target.checked)}
+                onClick={e => e.stopPropagation()}
+                className="accent-blue-600 scale-125"
+                title="Selecionar sinal"
+              />
+            )}
+          </div>
           <div className={`p-2 rounded-full ${signal.type === 'BUY' ? 'bg-green-100' : 'bg-red-100'}`}>
             {signal.type === 'BUY' ? (
               <TrendingUp className="w-5 h-5 text-green-600" />
@@ -52,6 +68,16 @@ export function SignalCard({ signal, onUpdateStatus, onClick }: SignalCardProps)
             {signal.confidence}% Confiança
           </span>
           <span className={`w-3 h-3 rounded-full ${getStatusColor(signal.status)}`}></span>
+          {/* Botão deletar individual */}
+          {onDelete && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(); }}
+              className="ml-2 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs font-bold"
+              title="Deletar sinal"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
