@@ -4,14 +4,48 @@ import { TrendingUp, TrendingDown, Clock, Target, Shield, Zap } from 'lucide-rea
 
 interface SignalCardProps {
   signal: Signal;
-  onUpdateStatus: (id: string, status: Signal['status']) => void;
+  // onUpdateStatus removido pois não é utilizado
+  onTrade?: (id: string) => void;
   onClick?: () => void;
   selected?: boolean;
   onSelect?: (checked: boolean) => void;
   onDelete?: () => void;
 }
 
-export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, onSelect, onDelete }: SignalCardProps) {
+export function SignalCard({ signal, onClick, selected = false, onSelect, onDelete, onTrade }: SignalCardProps) {
+  const [showToast, setShowToast] = React.useState(false);
+  const showCopyToast = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 1200);
+  };
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(showCopyToast).catch(() => {
+        // Fallback para browsers que não suportam clipboard API
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showCopyToast();
+        } catch (err) {}
+        document.body.removeChild(textarea);
+      });
+    } else {
+      // Fallback direto
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showCopyToast();
+      } catch (err) {}
+      document.body.removeChild(textarea);
+    }
+  };
+  const [tradeClicked, setTradeClicked] = React.useState(false);
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-green-600 bg-green-100';
     if (confidence >= 60) return 'text-yellow-600 bg-yellow-100';
@@ -36,6 +70,11 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
       className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-300 cursor-pointer group"
       onClick={onClick}
     >
+        {showToast && (
+          <div style={{position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 9999}} className="bg-black text-white px-4 py-2 rounded shadow-lg text-sm">
+            Copiado!
+          </div>
+        )}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           {/* Checkbox de seleção sempre visível à esquerda */}
@@ -59,7 +98,13 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
             )}
           </div>
           <div>
-            <h3 className="font-bold text-lg text-gray-900">{signal.symbol}</h3>
+            <h3
+              className="font-bold text-lg text-gray-900 cursor-pointer hover:underline"
+              title="Clique para copiar"
+              onClick={e => { e.stopPropagation(); copyToClipboard(signal.symbol); }}
+            >
+              {signal.symbol}
+            </h3>
             <p className="text-sm text-gray-500">{signal.timeframe}</p>
           </div>
         </div>
@@ -87,7 +132,13 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
             <Zap className="w-4 h-4 text-blue-600" />
             <span className="text-sm font-medium text-gray-600">Entrada</span>
           </div>
-          <p className="text-lg font-bold text-gray-900">${formatPrice(signal.entryPrice)}</p>
+          <p
+            className="text-lg font-bold text-gray-900 cursor-pointer hover:underline"
+            title="Clique para copiar"
+            onClick={e => { e.stopPropagation(); copyToClipboard(formatPrice(signal.entryPrice)); }}
+          >
+            ${formatPrice(signal.entryPrice)}
+          </p>
         </div>
         
         <div className="bg-gray-50 p-3 rounded-lg">
@@ -96,7 +147,13 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
             <span className="text-sm font-medium text-gray-600">Alvo</span>
           </div>
           <p className="text-lg font-bold text-green-600">
-            ${formatPrice(signal.targetPrice)}
+            <span
+              className="cursor-pointer hover:underline"
+              title="Clique para copiar"
+              onClick={e => { e.stopPropagation(); copyToClipboard(formatPrice(signal.targetPrice)); }}
+            >
+              ${formatPrice(signal.targetPrice)}
+            </span>
             <span className="text-xs ml-1 text-green-500">
               (+{((signal.targetPrice - signal.entryPrice) / signal.entryPrice * 100).toFixed(2)}%)
             </span>
@@ -109,7 +166,13 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
             <span className="text-sm font-medium text-gray-600">Stop Loss</span>
           </div>
           <p className="text-lg font-bold text-red-600">
-            ${formatPrice(signal.stopLoss)}
+            <span
+              className="cursor-pointer hover:underline"
+              title="Clique para copiar"
+              onClick={e => { e.stopPropagation(); copyToClipboard(formatPrice(signal.stopLoss)); }}
+            >
+              ${formatPrice(signal.stopLoss)}
+            </span>
             <span className="text-xs ml-1 text-red-500">
               ({((signal.stopLoss - signal.entryPrice) / signal.entryPrice * 100).toFixed(2)}%)
             </span>
@@ -150,20 +213,17 @@ export function SignalCard({ signal, onUpdateStatus, onClick, selected = false, 
         
         <div className="flex gap-2">
           {signal.status === 'PENDING' && (
-            <>
-              <button
-                onClick={() => onUpdateStatus(signal.id, 'WIN')}
-                className="px-3 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors font-medium"
-              >
-                ✓ Win
-              </button>
-              <button
-                onClick={() => onUpdateStatus(signal.id, 'LOSS')}
-                className="px-3 py-1 bg-red-500 text-white text-xs rounded-md hover:bg-red-600 transition-colors font-medium"
-              >
-                ✗ Loss
-              </button>
-            </>
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                setTradeClicked(true);
+                if (typeof onTrade === 'function') onTrade(signal.id);
+              }}
+              disabled={tradeClicked}
+              className={`px-4 py-1 bg-blue-600 text-white text-xs rounded-md transition-colors font-medium ${tradeClicked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+            >
+              Trade
+            </button>
           )}
         </div>
       </div>

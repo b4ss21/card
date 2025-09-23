@@ -1,18 +1,4 @@
-  // Selecionar todos os sinais gerados
-  function handleSelectAllSignals(checked: boolean) {
-    if (checked) {
-      setSelectedSignals(filteredSignals.map((s: Signal) => s.id));
-    } else {
-      setSelectedSignals([]);
-    }
-  }
-
-  // Deletar selecionados dos sinais gerados
-  function handleDeleteSelectedSignals() {
-    setSignals((prev: Signal[]) => prev.filter((s: Signal) => !selectedSignals.includes(s.id)));
-    setSelectedSignals([]);
-  }
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CryptoPair, Signal, Timeframe } from '../types';
 import { BinanceService } from '../services/binanceApi';
 import { TechnicalAnalysisService } from '../services/technicalAnalysis';
@@ -23,6 +9,38 @@ import { ImageAnalysis } from './ImageAnalysis';
 import { Settings, RefreshCw, Filter } from 'lucide-react';
 
 export function Dashboard() {
+  // Toast para copiar
+  const [showToast, setShowToast] = useState(false);
+  const showCopyToast = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 1200);
+  };
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(showCopyToast).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          showCopyToast();
+        } catch (err) {}
+        document.body.removeChild(textarea);
+      });
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showCopyToast();
+      } catch (err) {}
+      document.body.removeChild(textarea);
+    }
+  };
+  // ...existing code...
   // Estado para seleção de sinais
   // Selecionar todos os sinais gerados
   function handleSelectAllSignals(checked: boolean) {
@@ -215,6 +233,10 @@ export function Dashboard() {
               reason: 'Rompimento da banda do meio da BB (SMA20)'
             });
           }
+        } else if (analysisMode === 'rompimentoLTB') {
+          // Sinal de rompimento da LTB
+          const ltbSignals = technicalService.detectLTBBreakout(candles, pair.symbol, selectedTimeframe, minConfidence);
+          allSignals.push(...ltbSignals);
         }
       }
       // Ordena e limita os sinais
@@ -333,9 +355,6 @@ export function Dashboard() {
   }
 
   // Atualiza status de um sinal monitorado
-  function handleUpdateStatus(id: string, status: Signal['status']) {
-    setActiveSignals(prev => prev.map(s => s.id === id ? { ...s, status } : s));
-  }
 
   // Estatísticas do gerador de sinais (não do monitoramento)
   function calculateStats() {
@@ -471,6 +490,7 @@ export function Dashboard() {
                 <option value="candles">Somente Candles</option>
                 <option value="bbUpperBreak">Rompimento Banda Superior BB</option>
                 <option value="bbMiddleBreak">Rompimento Banda do Meio BB (SMA20)</option>
+                <option value="rompimentoLTB">Rompimento da LTB</option>
               </select>
             </div>
             <div>
@@ -609,9 +629,7 @@ export function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredSignals.map(signal => {
                 const handleCardClick = () => {
-                  // Ativa o sinal (simula trade)
-                  handleActivateSignal(signal);
-                  // Seleciona o símbolo e rola para o gráfico
+                  // Apenas seleciona o símbolo e rola para o gráfico
                   if (typeof window !== 'undefined' && chartRef.current) {
                     setSelectedSymbol(signal.symbol);
                     setTimeout(() => {
@@ -619,12 +637,21 @@ export function Dashboard() {
                     }, 100);
                   }
                 };
+                const handleTradeSignal = (id: string) => {
+                  // Ativa o sinal (simula trade)
+                  const tradeSignal = signals.find(s => s.id === id);
+                  if (tradeSignal) {
+                    handleActivateSignal(tradeSignal);
+                    // Exibe mensagem de sucesso (pode ser substituído por toast, modal, etc)
+                    alert(`Trade executado para o sinal ${tradeSignal.symbol}`);
+                  }
+                };
                 return (
                   <SignalCard
                     key={signal.id}
                     signal={signal}
-                    onUpdateStatus={handleUpdateStatus}
                     onClick={handleCardClick}
+                    onTrade={handleTradeSignal}
                     selected={selectedSignals.includes(signal.id)}
                     onSelect={checked => handleSelectSignal(signal.id, checked)}
                     onDelete={() => handleDeleteSignal(signal.id)}
@@ -636,6 +663,11 @@ export function Dashboard() {
         </div>
 
         {/* Lista de sinais monitorados (ativos) com seleção */}
+        {showToast && (
+          <div style={{position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 9999}} className="bg-black text-white px-4 py-2 rounded shadow-lg text-sm">
+            Copiado!
+          </div>
+        )}
         <div className="mb-6">
           <h2 className="text-lg font-bold mb-2">Sinais Ativos</h2>
           {activeSignals.length === 0 ? (
@@ -694,12 +726,32 @@ export function Dashboard() {
                           className="accent-blue-600"
                         />
                         {signal.type === 'BUY' ? <BuyIcon /> : <SellIcon />}
-                        <span className="font-bold">{signal.symbol}</span>
+                        <span
+                          className="font-bold cursor-pointer hover:underline"
+                          title="Clique para copiar"
+                          onClick={e => { e.stopPropagation(); copyToClipboard(signal.symbol); }}
+                        >{signal.symbol}</span>
                         <span className={signal.type === 'BUY' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
                           {signal.type}
                         </span>
                         <span className="text-xs text-gray-500 bg-gray-100 rounded px-2 py-0.5 ml-1">{signal.timeframe}</span>
-                        <span className="ml-2">| Entrada: {fmt(signal.entryPrice)} | Target: {fmt(signal.targetPrice)} | Stop: {fmt(signal.stopLoss)}</span>
+                        <span className="ml-2">
+                          | Entrada: <span
+                            className="cursor-pointer hover:underline"
+                            title="Clique para copiar"
+                            onClick={e => { e.stopPropagation(); copyToClipboard(fmt(signal.entryPrice)); }}
+                          >{fmt(signal.entryPrice)}</span>
+                          | Target: <span
+                            className="cursor-pointer hover:underline"
+                            title="Clique para copiar"
+                            onClick={e => { e.stopPropagation(); copyToClipboard(fmt(signal.targetPrice)); }}
+                          >{fmt(signal.targetPrice)}</span>
+                          | Stop: <span
+                            className="cursor-pointer hover:underline"
+                            title="Clique para copiar"
+                            onClick={e => { e.stopPropagation(); copyToClipboard(fmt(signal.stopLoss)); }}
+                          >{fmt(signal.stopLoss)}</span>
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span

@@ -77,7 +77,7 @@ export class BinanceService {
 
       const usdtPairs = (data as Ticker24hr[])
         .filter((ticker) => ticker.symbol.endsWith('USDT'))
-        .filter((ticker) => parseFloat(ticker.quoteVolume) > 1000000) // Filter by volume
+        // Removido filtro de volume para incluir todos os pares USDT
         .map((ticker, index: number) => ({
           symbol: ticker.symbol,
           price: parseFloat(ticker.lastPrice),
