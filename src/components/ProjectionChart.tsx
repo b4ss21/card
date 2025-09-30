@@ -93,40 +93,36 @@ export function ProjectionChart({ data, height = 400 }: ProjectionChartProps) {
     historicalSeriesRef.current.setData(historicalData);
     projectionSeriesRef.current.setData(projectionData);
 
-    // Linhas de preço (entrada, alvo, stop)
-    const entryLine = historicalSeriesRef.current.createPriceLine({
-      price: data.entryPrice,
-      color: '#6366f1',
-      lineWidth: 2,
-      lineStyle: 0,
-      title: `Entrada: $${data.entryPrice.toFixed(4)}`,
-    });
+    // Linhas de preço (entrada, alvo, stop) - usando setTimeout para garantir que o gráfico esteja pronto
+    setTimeout(() => {
+      if (historicalSeriesRef.current) {
+        const entryLine = historicalSeriesRef.current.createPriceLine({
+          price: data.entryPrice,
+          color: '#6366f1',
+          lineWidth: 2,
+          lineStyle: 0,
+          title: `Entrada: $${data.entryPrice.toFixed(4)}`,
+        });
 
-    const targetLine = historicalSeriesRef.current.createPriceLine({
-      price: data.targetPrice,
-      color: '#16a34a',
-      lineWidth: 2,
-      lineStyle: 0,
-      title: `Alvo: $${data.targetPrice.toFixed(4)} (+${data.gainPercent.toFixed(2)}%)`,
-    });
+        const targetLine = historicalSeriesRef.current.createPriceLine({
+          price: data.targetPrice,
+          color: '#16a34a',
+          lineWidth: 2,
+          lineStyle: 0,
+          title: `Alvo: $${data.targetPrice.toFixed(4)} (+${data.gainPercent.toFixed(2)}%)`,
+        });
 
-    const stopLine = historicalSeriesRef.current.createPriceLine({
-      price: data.stopLoss,
-      color: '#dc2626',
-      lineWidth: 2,
-      lineStyle: 0,
-      title: `Stop: $${data.stopLoss.toFixed(4)}`,
-    });
+        const stopLine = historicalSeriesRef.current.createPriceLine({
+          price: data.stopLoss,
+          color: '#dc2626',
+          lineWidth: 2,
+          lineStyle: 0,
+          title: `Stop: $${data.stopLoss.toFixed(4)}`,
+        });
+      }
+    }, 100);
 
     chartRef.current.timeScale().fitContent();
-
-    return () => {
-      if (historicalSeriesRef.current) {
-        historicalSeriesRef.current.removePriceLine(entryLine);
-        historicalSeriesRef.current.removePriceLine(targetLine);
-        historicalSeriesRef.current.removePriceLine(stopLine);
-      }
-    };
   }, [data]);
 
   return (
