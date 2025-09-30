@@ -7,6 +7,7 @@ export class TechnicalAnalysisService {
   // Detecta rompimento de LTB (Linha de Tendência de Baixa)
   detectLTBBreakout(candles: Candle[], symbol: string, timeframe: string, minConfidence: number): Signal[] {
     if (candles.length < 10) return [];
+    
     // Encontrar os últimos 3 topos descendentes
     const tops: { idx: number, price: number }[] = [];
     for (let i = 1; i < candles.length - 1; i++) {
@@ -14,13 +15,17 @@ export class TechnicalAnalysisService {
         tops.push({ idx: i, price: candles[i].high });
       }
     }
+    
     // Pega os 2 topos mais recentes para traçar LTB
     if (tops.length < 2) return [];
     const [top1, top2] = tops.slice(-2);
+    
     // Calcula a inclinação da LTB
     const slope = (top2.price - top1.price) / (top2.idx - top1.idx);
+    
     // Projeta o preço da LTB para o último candle
     const ltbPrice = top2.price + slope * (candles.length - 1 - top2.idx);
+    
     // Se o último fechamento rompeu a LTB
     const lastCandle = candles[candles.length - 1];
     if (lastCandle.close > ltbPrice) {
@@ -28,34 +33,26 @@ export class TechnicalAnalysisService {
       const entryPrice = lastCandle.close;
       const targetPrice = entryPrice * 1.03;
       const stopLoss = entryPrice * 0.98;
-      const emptyIndicators: TechnicalIndicators = {
-        ema12: entryPrice,
-        ema26: entryPrice,
-        ema50: entryPrice,
-        rsi: 50,
-        stochastic: { k: 50, d: 50 },
-        bollingerBands: { upper: entryPrice, middle: entryPrice, lower: entryPrice },
-        macd: { macd: 0, signal: 0, histogram: 0 },
-        volatility: 0,
-        volumeProfile: 1
-      };
+      const indicators = this.analyzeIndicators(candles);
+      
       return [{
-  id: `${symbol}-ltb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-  symbol,
-  type: 'BUY',
-  entryPrice,
-  targetPrice,
-  stopLoss,
-  confidence: 70,
-  status: 'PENDING',
-  timeframe,
-  indicators: emptyIndicators,
-  btcCorrelation: 0,
-  expectedGain: 3,
-  timestamp: new Date(),
-  reason: 'Rompimento da LTB',
+        id: `${symbol}-ltb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        symbol,
+        type: 'BUY',
+        entryPrice,
+        targetPrice,
+        stopLoss,
+        confidence: 70,
+        status: 'PENDING',
+        timeframe,
+        indicators,
+        btcCorrelation: 0,
+        expectedGain: 3,
+        timestamp: new Date(),
+        reason: 'Rompimento da LTB'
       }];
     }
+    
     return [];
   }
   private _indicatorsSummary(ind: TechnicalIndicators): string {

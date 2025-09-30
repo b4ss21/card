@@ -247,10 +247,6 @@ export function Dashboard() {
           if (projectionSignal) {
             allSignals.push(projectionSignal);
           }
-        }
-      }
-      // Ordena e limita os sinais
-      const sortedSignals = allSignals
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, maxSignals);
       if (sortedSignals.length > 0) {
@@ -262,6 +258,60 @@ export function Dashboard() {
       setIsGenerating(false);
     }
   };
+        } else if (analysisMode === 'bbUpperBreak') {
+          // Sinal apenas se fechamento rompeu a banda superior da BB
+          const closes = candles.map(c => c.close);
+          const bb = technicalService.calculateBollingerBands(closes);
+          const lastCandle = candles[candles.length - 1];
+          if (lastCandle.close > bb.upper) {
+            const indicators = technicalService.analyzeIndicators(candles);
+            const signal = {
+              id: `${selectedSymbol}-bbupper-${Date.now()}`,
+              symbol: selectedSymbol,
+              type: 'BUY' as const,
+              entryPrice: lastCandle.close,
+              targetPrice: lastCandle.close * 1.02,
+              stopLoss: lastCandle.close * 0.98,
+              confidence: 75,
+              timestamp: new Date(),
+              timeframe: selectedTimeframe,
+              expectedGain: 2,
+              btcCorrelation: 0,
+              status: 'PENDING' as const,
+              indicators,
+              reason: 'Rompimento da banda superior da BB'
+            };
+            setSignals(prev => [signal, ...prev].slice(0, 100));
+          } else {
+            setSignalError('Preço atual não rompeu a banda superior da Bollinger Band.');
+          }
+        } else if (analysisMode === 'bbMiddleBreak') {
+          // Sinal apenas se fechamento rompeu a banda do meio (SMA20)
+          const closes = candles.map(c => c.close);
+          const bb = technicalService.calculateBollingerBands(closes);
+          const lastCandle = candles[candles.length - 1];
+          if (lastCandle.close > bb.middle) {
+            const indicators = technicalService.analyzeIndicators(candles);
+            const signal = {
+              id: `${selectedSymbol}-bbmiddle-${Date.now()}`,
+              symbol: selectedSymbol,
+              type: 'BUY' as const,
+              entryPrice: lastCandle.close,
+              targetPrice: lastCandle.close * 1.02,
+              stopLoss: lastCandle.close * 0.98,
+              confidence: 70,
+              timestamp: new Date(),
+              timeframe: selectedTimeframe,
+              expectedGain: 2,
+              btcCorrelation: 0,
+              status: 'PENDING' as const,
+              indicators,
+              reason: 'Rompimento da banda do meio da BB (SMA20)'
+            };
+            setSignals(prev => [signal, ...prev].slice(0, 100));
+          } else {
+            setSignalError('Preço atual não rompeu a banda do meio da Bollinger Band.');
+          }
 
   const generateSignalForSymbol = async () => {
     setSignalError(null);
