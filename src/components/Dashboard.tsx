@@ -289,7 +289,7 @@ export function Dashboard() {
         } else {
           setSignalError('Não foi possível gerar sinal para esta moeda/timeframe com a confiança mínima definida.');
         }
-      } else {
+      } else if (analysisMode === 'candles') {
         // Apenas padrões de candles
         const candleSignals = technicalService.detectCandlePattern(candles, selectedSymbol, selectedTimeframe, minConfidence);
         if (candleSignals.length > 0) {
