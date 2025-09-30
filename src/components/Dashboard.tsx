@@ -6,6 +6,7 @@ import { SignalCard } from './SignalCard';
 import { BuyIcon, SellIcon } from './SignalIcons';
 import { TradingViewWidget } from './TradingViewWidget';
 import { ImageAnalysis } from './ImageAnalysis';
+import { ProjectionChart } from './ProjectionChart';
 import { Settings, RefreshCw, Filter } from 'lucide-react';
 
 export function Dashboard() {
@@ -104,7 +105,10 @@ export function Dashboard() {
       return '';
     }
   });
-  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators' | 'bbUpperBreak' | 'bbMiddleBreak'>('indicators');
+  const [analysisMode, setAnalysisMode] = useState<'candles' | 'indicators' | 'bbUpperBreak' | 'bbMiddleBreak' | 'projection'>('indicators');
+
+  // Estado para dados de projeção
+  const [projectionData, setProjectionData] = useState<any>(null);
 
   // Estado para seleção de sinais
   const [selectedSignals, setSelectedSignals] = useState<string[]>([]);
@@ -237,6 +241,12 @@ export function Dashboard() {
           // Sinal de rompimento da LTB
           const ltbSignals = technicalService.detectLTBBreakout(candles, pair.symbol, selectedTimeframe, minConfidence);
           allSignals.push(...ltbSignals);
+        } else if (analysisMode === 'projection') {
+          // Análise de projeção
+          const projectionSignal = technicalService.generateProjectionSignal(pair.symbol, candles, selectedTimeframe, minConfidence);
+          if (projectionSignal) {
+            allSignals.push(projectionSignal);
+          }
         }
       }
       // Ordena e limita os sinais
@@ -286,6 +296,27 @@ export function Dashboard() {
           setSignals(prev => [...candleSignals, ...prev].slice(0, 100));
         } else {
           setSignalError('Nenhum padrão de candle relevante detectado para este timeframe.');
+        }
+      } else if (analysisMode === 'projection') {
+        // Análise de projeção para símbolo específico
+        const projectionSignal = technicalService.generateProjectionSignal(selectedSymbol, candles, selectedTimeframe, minConfidence);
+        if (projectionSignal) {
+          setSignals(prev => [projectionSignal, ...prev].slice(0, 100));
+          
+          // Gera dados para o gráfico de projeção
+          const projectionAnalysis = technicalService.analyzeProjection(candles, selectedSymbol, selectedTimeframe);
+          if (projectionAnalysis) {
+            setProjectionData({
+              historicalCandles: candles.slice(-50), // Últimos 50 candles históricos
+              projectedPrices: projectionAnalysis.projectedPrices,
+              entryPrice: projectionAnalysis.entryPrice,
+              targetPrice: projectionAnalysis.targetPrice,
+              stopLoss: projectionAnalysis.stopLoss,
+              gainPercent: projectionAnalysis.gainPercent
+            });
+          }
+        } else {
+          setSignalError('Não foi possível gerar projeção para esta moeda/timeframe com a confiança mínima definida.');
         }
       }
     } catch (e) {
@@ -491,6 +522,7 @@ export function Dashboard() {
                 <option value="bbUpperBreak">Rompimento Banda Superior BB</option>
                 <option value="bbMiddleBreak">Rompimento Banda do Meio BB (SMA20)</option>
                 <option value="rompimentoLTB">Rompimento da LTB</option>
+                <option value="projection">Projeção de Movimento</option>
               </select>
             </div>
             <div>
@@ -579,6 +611,13 @@ export function Dashboard() {
             <div className="text-center text-gray-400 py-12">Selecione um sinal para visualizar o gráfico</div>
           )}
         </div>
+
+        {/* Gráfico de Projeção */}
+        {analysisMode === 'projection' && projectionData && (
+          <div className="mb-6">
+            <ProjectionChart data={projectionData} />
+          </div>
+        )}
 
         {/* Image Analysis */}
         <div className="mb-6">

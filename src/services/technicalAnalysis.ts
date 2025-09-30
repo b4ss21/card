@@ -1,6 +1,9 @@
 import { Candle, TechnicalIndicators, Signal } from '../types';
+import { ProjectionAnalysisService } from './projectionAnalysis';
 
 export class TechnicalAnalysisService {
+  private projectionService = new ProjectionAnalysisService();
+
   // Detecta rompimento de LTB (Linha de Tendência de Baixa)
   detectLTBBreakout(candles: Candle[], symbol: string, timeframe: string, minConfidence: number): Signal[] {
     if (candles.length < 10) return [];
@@ -810,5 +813,15 @@ export class TechnicalAnalysisService {
     const support = recentLows.slice(0, 3).reduce((sum, low) => sum + low, 0) / 3;
     
     return { support, resistance };
+  }
+
+  // Método para análise de projeção
+  analyzeProjection(candles: Candle[], symbol: string, timeframe: string) {
+    return this.projectionService.analyzeProjection(candles, symbol, timeframe);
+  }
+
+  // Gera sinal baseado em projeção
+  generateProjectionSignal(symbol: string, candles: Candle[], timeframe: string, minConfidence: number): Signal | null {
+    return this.projectionService.generateProjectionSignal(symbol, candles, timeframe, minConfidence);
   }
 }
