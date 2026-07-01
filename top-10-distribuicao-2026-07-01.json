@@ -1,0 +1,182 @@
+[
+  {
+    "posicao": 1,
+    "ticker": "ARKM",
+    "precoAtual": "$4.8500",
+    "ganho24h": "18.5%",
+    "suporte": "$4.2000",
+    "resistencia": "$5.5000",
+    "gatilho": "Abaixo de $4.1160",
+    "alvo": "$3.5700",
+    "downside": "-26.4%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 2,
+    "ticker": "ASTR",
+    "precoAtual": "$0.3500",
+    "ganho24h": "16.2%",
+    "suporte": "$0.2800",
+    "resistencia": "$0.4200",
+    "gatilho": "Abaixo de $0.2744",
+    "alvo": "$0.2380",
+    "downside": "-32.0%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 3,
+    "ticker": "ROSE",
+    "precoAtual": "$0.4500",
+    "ganho24h": "14.8%",
+    "suporte": "$0.3800",
+    "resistencia": "$0.5500",
+    "gatilho": "Abaixo de $0.3724",
+    "alvo": "$0.3230",
+    "downside": "-28.2%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 4,
+    "ticker": "BLUR",
+    "precoAtual": "$0.9200",
+    "ganho24h": "12.3%",
+    "suporte": "$0.7500",
+    "resistencia": "$1.1500",
+    "gatilho": "Abaixo de $0.7350",
+    "alvo": "$0.6375",
+    "downside": "-30.7%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 5,
+    "ticker": "INJ",
+    "precoAtual": "$28.5000",
+    "ganho24h": "11.9%",
+    "suporte": "$24.0000",
+    "resistencia": "$35.0000",
+    "gatilho": "Abaixo de $23.5200",
+    "alvo": "$20.4000",
+    "downside": "-28.4%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 6,
+    "ticker": "SEI",
+    "precoAtual": "$0.6200",
+    "ganho24h": "10.5%",
+    "suporte": "$0.5000",
+    "resistencia": "$0.8000",
+    "gatilho": "Abaixo de $0.4900",
+    "alvo": "$0.4250",
+    "downside": "-31.5%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 7,
+    "ticker": "DYDX",
+    "precoAtual": "$3.4500",
+    "ganho24h": "9.8%",
+    "suporte": "$2.8000",
+    "resistencia": "$4.5000",
+    "gatilho": "Abaixo de $2.7440",
+    "alvo": "$2.3800",
+    "downside": "-31.0%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 8,
+    "ticker": "MAGIC",
+    "precoAtual": "$1.2500",
+    "ganho24h": "8.7%",
+    "suporte": "$0.9500",
+    "resistencia": "$1.6500",
+    "gatilho": "Abaixo de $0.9310",
+    "alvo": "$0.8075",
+    "downside": "-35.4%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 9,
+    "ticker": "THETA",
+    "precoAtual": "$2.1500",
+    "ganho24h": "7.4%",
+    "suporte": "$1.7500",
+    "resistencia": "$2.8000",
+    "gatilho": "Abaixo de $1.7150",
+    "alvo": "$1.4875",
+    "downside": "-30.8%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  },
+  {
+    "posicao": 10,
+    "ticker": "PEPE",
+    "precoAtual": "$0.000009",
+    "ganho24h": "6.2%",
+    "suporte": "$0.000007",
+    "resistencia": "$0.000012",
+    "gatilho": "Abaixo de $0.0000068",
+    "alvo": "$0.000006",
+    "downside": "-31.2%",
+    "criterios": [
+      "✓ Trading Range lateral (< 4%)",
+      "✓ Múltiplos Upthrusts (4+)",
+      "✓ Squeeze Bollinger Bands",
+      "✓ Volume divergência (alta em baixas)",
+      "✓ Bearish Divergence RSI"
+    ]
+  }
+]
